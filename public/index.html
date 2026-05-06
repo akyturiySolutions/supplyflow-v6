@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="refresh" content="0; url=/login.html">
+<title>SupplyFlow V6</title>
+<style>
+  body{font-family:sans-serif;background:#070c18;color:#e8f0ff;
+    display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
+</style>
+</head>
+<body>
+<p>Redirecting… <a href="/login.html" style="color:#00e5a0">Click here</a> if not redirected.</p>
+<script>
+  const t = localStorage.getItem('sf_token');
+  window.location.href = t ? '/admin.html' : '/login.html';
+</script>
+</body>
+</html>
