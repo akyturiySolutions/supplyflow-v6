@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SupplyFlow V6 — Admin Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#070c18;--sidebar:#0d1526;--card:#0f1a2e;--card2:#111f35;
+  --border:#1a2840;--accent:#00e5a0;--accent2:#0ea5e9;--accent3:#f59e0b;
+  --text:#e8f0ff;--muted:#6b7fa0;--danger:#f43f5e;--success:#00e5a0;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);
+  display:flex;min-height:100vh;overflow-x:hidden}
+/* Sidebar */
+.sidebar{width:220px;min-height:100vh;background:var(--sidebar);
+  border-right:1px solid var(--border);display:flex;flex-direction:column;
+  position:fixed;top:0;left:0;z-index:100}
+.logo{padding:24px 20px;border-bottom:1px solid var(--border)}
+.logo h1{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo p{color:var(--muted);font-size:11px;margin-top:2px}
+nav{flex:1;padding:16px 12px}
+.nav-link{display:flex;align-items:center;gap:10px;padding:10px 12px;
+  border-radius:10px;color:var(--muted);font-size:14px;font-weight:500;
+  cursor:pointer;transition:.15s;margin-bottom:2px}
+.nav-link:hover,.nav-link.active{background:rgba(0,229,160,.08);color:var(--text)}
+.nav-link.active{color:var(--accent)}
+.nav-link span{font-size:16px}
+.sidebar-foot{padding:16px;border-top:1px solid var(--border)}
+.sidebar-foot button{width:100%;padding:9px;background:transparent;
+  border:1px solid var(--border);color:var(--muted);border-radius:8px;
+  cursor:pointer;font-size:13px;transition:.15s}
+.sidebar-foot button:hover{border-color:var(--danger);color:var(--danger)}
+/* Main */
+.main{margin-left:220px;flex:1;padding:28px 32px;min-height:100vh}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px}
+.topbar h2{font-family:'Syne',sans-serif;font-size:22px;font-weight:700}
+.status-dot{width:8px;height:8px;background:var(--accent);border-radius:50%;
+  box-shadow:0 0 6px var(--accent);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.biz-badge{font-size:12px;color:var(--muted);background:var(--card);
+  border:1px solid var(--border);padding:6px 12px;border-radius:20px}
+/* Stat cards */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:28px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:14px;
+  padding:20px;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--accent),var(--accent2))}
+.stat-label{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;
+  letter-spacing:.05em;margin-bottom:10px}
+.stat-val{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--text)}
+.stat-sub{font-size:12px;color:var(--accent);margin-top:4px}
+/* Section */
+.section{display:none}
+.section.active{display:block}
+/* Table */
+.table-wrap{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.table-head{display:flex;align-items:center;justify-content:space-between;
+  padding:16px 20px;border-bottom:1px solid var(--border)}
+.table-head h3{font-size:15px;font-weight:600}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{text-align:left;font-size:12px;font-weight:600;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.05em;padding:12px 20px;
+  border-bottom:1px solid var(--border);background:var(--card2)}
+.tbl td{padding:13px 20px;font-size:13px;border-bottom:1px solid rgba(26,40,64,.5)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:rgba(0,229,160,.03)}
+.badge{display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;
+  border-radius:20px;text-transform:uppercase}
+.badge.PENDING_PAYMENT{background:rgba(245,158,11,.15);color:var(--accent3)}
+.badge.PAID,.badge.CONFIRMED_COD{background:rgba(0,229,160,.15);color:var(--accent)}
+.badge.DISPATCHED,.badge.PROCESSING{background:rgba(14,165,233,.15);color:var(--accent2)}
+.badge.DELIVERED{background:rgba(0,229,160,.25);color:#00ff9d}
+.badge.CANCELLED{background:rgba(244,63,94,.15);color:var(--danger)}
+.btn-sm{padding:5px 12px;font-size:12px;font-weight:600;border:none;
+  border-radius:7px;cursor:pointer;transition:.15s}
+.btn-primary{background:var(--accent);color:#000}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-sm:hover{opacity:.85}
+/* Analytics chart */
+.chart-bar-wrap{display:flex;align-items:flex-end;gap:6px;height:120px;
+  padding:16px 20px;border-top:1px solid var(--border)}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.bar{width:100%;background:linear-gradient(180deg,var(--accent),var(--accent2));
+  border-radius:4px 4px 0 0;min-height:4px;transition:.4s}
+.bar-label{font-size:9px;color:var(--muted)}
+/* Config */
+.config-grid{display:grid;gap:16px}
+.config-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px}
+.config-card h3{font-size:14px;font-weight:600;margin-bottom:16px;color:var(--accent)}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.field input,.field select,.field textarea{width:100%;padding:10px 12px;
+  background:#070c18;border:1px solid var(--border);border-radius:8px;
+  color:var(--text);font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:.2s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent)}
+.field textarea{min-height:80px;resize:vertical}
+.save-btn{padding:10px 24px;background:var(--accent);color:#000;font-weight:700;
+  border:none;border-radius:8px;cursor:pointer;font-size:13px}
+/* Loading */
+.loading{text-align:center;padding:40px;color:var(--muted)}
+/* Empty */
+.empty{text-align:center;padding:40px;color:var(--muted);font-size:14px}
+/* Modal */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(7,12,24,.85);
+  z-index:200;align-items:center;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:16px;
+  padding:28px;width:90%;max-width:480px;max-height:90vh;overflow-y:auto}
+.modal h3{font-size:17px;font-weight:700;margin-bottom:16px}
+.modal-actions{display:flex;gap:10px;margin-top:20px;justify-content:flex-end}
+/* Toast */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--card);
+  border:1px solid var(--accent);color:var(--accent);padding:12px 20px;
+  border-radius:10px;font-size:13px;font-weight:600;transform:translateY(100px);
+  transition:.3s;z-index:300}
+.toast.show{transform:translateY(0)}
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%)}
+  .main{margin-left:0;padding:16px}
+}
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="logo">
+    <h1>⚡ SupplyFlow</h1>
+    <p>V6 Universal Admin</p>
+  </div>
+  <nav>
+    <div class="nav-link active" onclick="nav('dashboard')"><span>📊</span> Dashboard</div>
+    <div class="nav-link" onclick="nav('orders')"><span>📦</span> Orders</div>
+    <div class="nav-link" onclick="nav('clients')"><span>👥</span> Clients</div>
+    <div class="nav-link" onclick="nav('analytics')"><span>📈</span> Analytics</div>
+    <div class="nav-link" onclick="nav('config')"><span>⚙️</span> Configuration</div>
+    <div class="nav-link" onclick="nav('setup')"><span>🚀</span> Deployment</div>
+  </nav>
+  <div class="sidebar-foot">
+    <button onclick="logout()">Sign Out</button>
+  </div>
+</aside>
+
+<!-- Main -->
+<main class="main">
+  <div class="topbar">
+    <h2 id="page-title">Dashboard</h2>
+    <div class="topbar-right">
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)">
+        <div class="status-dot"></div> Bot Online
+      </div>
+      <div class="biz-badge" id="biz-name">Loading…</div>
+      <button class="btn-sm btn-primary" onclick="refreshAll()">↻ Refresh</button>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="section active" id="sec-dashboard">
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-card"><div class="stat-label">Orders Today</div><div class="stat-val" id="st-orders">—</div></div>
+      <div class="stat-card"><div class="stat-label">Revenue Today</div><div class="stat-val" id="st-rev">—</div></div>
+      <div class="stat-card"><div class="stat-label">Total Clients</div><div class="stat-val" id="st-clients">—</div></div>
+      <div class="stat-card"><div class="stat-label">30-Day Revenue</div><div class="stat-val" id="st-mrr">—</div></div>
+    </div>
+    <div class="table-wrap" style="margin-bottom:20px">
+      <div class="table-head"><h3>Recent Orders</h3></div>
+      <table class="tbl">
+        <thead><tr>
+          <th>Order ID</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Time</th><th></th>
+        </tr></thead>
+        <tbody id="recent-orders"><tr><td colspan="7" class="loading">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Orders -->
+  <div class="section" id="sec-orders">
+    <div class="table-wrap">
+      <div class="table-head">
+        <h3>All Orders</h3>
+        <select id="order-filter" onchange="renderOrders()" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:7px;font-size:13px">
+          <option value="">All Statuses</option>
+          <option value="PENDING_PAYMENT">Pending Payment</option>
+          <option value="PAID">Paid</option>
+          <option value="CONFIRMED_COD">COD Confirmed</option>
+          <option value="PROCESSING">Processing</option>
+          <option value="DISPATCHED">Dispatched</option>
+          <option value="DELIVERED">Delivered</option>
+          <option value="CANCELLED">Cancelled</option>
+        </select>
+      </div>
+      <table class="tbl">
+        <thead><tr>
+          <th>Order ID</th><th>Customer</th><th>Address</th><th>Total</th><th>Status</th><th>Date</th><th>Action</th>
+        </tr></thead>
+        <tbody id="all-orders"><tr><td colspan="7" class="loading">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Clients -->
+  <div class="section" id="sec-clients">
+    <div class="table-wrap">
+      <div class="table-head"><h3>Registered Clients</h3></div>
+      <table class="tbl">
+        <thead><tr>
+          <th>Name</th><th>Phone</th><th>Orders</th><th>Last Order</th><th>Action</th>
+        </tr></thead>
+        <tbody id="clients-body"><tr><td colspan="5" class="loading">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Analytics -->
+  <div class="section" id="sec-analytics">
+    <div class="table-wrap" style="margin-bottom:20px">
+      <div class="table-head"><h3>Revenue — Last 14 Days</h3></div>
+      <div class="chart-bar-wrap" id="rev-chart"></div>
+    </div>
+    <div class="stats-grid" id="analytics-summary"></div>
+  </div>
+
+  <!-- Config -->
+  <div class="section" id="sec-config">
+    <div class="config-grid">
+      <div class="config-card">
+        <h3>Business Settings</h3>
+        <div class="field"><label>Business Name</label><input id="cfg-name" placeholder="My Supply Co"></div>
+        <div class="field"><label>Sector</label>
+          <select id="cfg-sector">
+            <option value="water">🚰 Water Supply</option>
+            <option value="gas">🔥 Gas Supply</option>
+            <option value="food">🍱 Food Delivery</option>
+            <option value="milk">🥛 Milk / Dairy</option>
+            <option value="retail">🏪 Retail</option>
+          </select>
+        </div>
+        <div class="field"><label>WhatsApp Greeting</label><textarea id="cfg-greeting" placeholder="Welcome to our store! How can we help?"></textarea></div>
+        <div class="field"><label>Support Phone (with country code)</label><input id="cfg-support" placeholder="254712345678"></div>
+        <button class="save-btn" onclick="saveConfig()">Save Settings</button>
+      </div>
+      <div class="config-card">
+        <h3>M-Pesa Settings</h3>
+        <div class="field"><label>Till / Buy Goods Number</label><input id="cfg-till" placeholder="6247361"></div>
+        <div class="field"><label>Business Shortcode (STK Push)</label><input id="cfg-shortcode" placeholder="174379"></div>
+        <p style="font-size:12px;color:var(--muted)">STK Push requires MPESA_KEY, MPESA_SECRET, MPESA_PASSKEY in your .env</p>
+        <button class="save-btn" onclick="saveConfig()">Save M-Pesa</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Deployment Guide -->
+  <div class="section" id="sec-setup">
+    <div class="config-card">
+      <h3>🚀 Deployment Checklist</h3>
+      <div style="font-size:14px;line-height:1.9;color:var(--text)">
+        <p><strong style="color:var(--accent)">1. Environment Variables</strong><br>
+        Set these in Render / Railway / your server:</p>
+        <pre style="background:#070c18;padding:14px;border-radius:8px;font-size:12px;color:#a8d8b0;margin:10px 0;overflow-x:auto">PORT=3000
+VERIFY_TOKEN=your_secret_verify_token
+WHATSAPP_TOKEN=your_meta_access_token
+PHONE_NUMBER_ID=your_meta_phone_number_id
+APP_SECRET=your_meta_app_secret
+ADMIN_TOKEN=your_admin_dashboard_token
+ADMIN_EMAIL=admin@yourbusiness.com
+ADMIN_PASSWORD=strong_password_here
+BUSINESS_ID=your_business_id
+BIZ_NAME=Your Business Name
+BIZ_SECTOR=water   # or gas/food/milk/retail
+MPESA_TILL=6247361
+MPESA_KEY=safaricom_consumer_key
+MPESA_SECRET=safaricom_consumer_secret
+MPESA_SHORTCODE=174379
+MPESA_PASSKEY=your_mpesa_passkey
+MPESA_ENV=sandbox  # change to production when live
+APP_URL=https://yourapp.onrender.com
+SUPPORT_PHONE=254712345678
+FIREBASE_CONFIG={"type":"service_account","project_id":"..."}  # optional</pre>
+
+        <p><strong style="color:var(--accent)">2. WhatsApp Webhook</strong><br>
+        In Meta Developer Console → WhatsApp → Configuration:</p>
+        <pre style="background:#070c18;padding:14px;border-radius:8px;font-size:12px;color:#a8d8b0;margin:10px 0">Callback URL:  https://YOURAPP.onrender.com/webhook
+Verify Token:  (same as VERIFY_TOKEN above)
+
+Subscribe to: messages, message_deliveries, message_reads</pre>
+
+        <p><strong style="color:var(--accent)">3. Deploy to Render</strong></p>
+        <ul style="margin:8px 0 8px 20px;line-height:2">
+          <li>Push code to GitHub</li>
+          <li>New Web Service → connect repo</li>
+          <li>Build: <code style="color:var(--accent)">npm install</code></li>
+          <li>Start: <code style="color:var(--accent)">npm start</code></li>
+          <li>Add all environment variables above</li>
+        </ul>
+
+        <p><strong style="color:var(--accent)">4. Multi-Tenant (SaaS)</strong><br>
+        Each business gets their own WhatsApp Phone Number ID.<br>
+        Map <code>PHONE_NUMBER_ID → bizId</code> in Firestore <code>businesses</code> collection.<br>
+        One server instance can handle unlimited businesses.</p>
+
+        <p><strong style="color:var(--accent)">5. Custom Products</strong><br>
+        Add products to Firestore: <code>businesses/{bizId}.products = [...]</code><br>
+        Or use the API: <code>POST /api/admin/config</code> with products array.</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Order Update Modal -->
+<div class="modal-bg" id="order-modal">
+  <div class="modal">
+    <h3>Update Order <span id="modal-order-id"></span></h3>
+    <div class="field"><label>New Status</label>
+      <select id="modal-status">
+        <option value="PAID">Paid</option>
+        <option value="PROCESSING">Processing</option>
+        <option value="DISPATCHED">Dispatched</option>
+        <option value="DELIVERED">Delivered</option>
+        <option value="CANCELLED">Cancelled</option>
+      </select>
+    </div>
+    <div class="field"><label>Driver Phone (optional)</label>
+      <input id="modal-driver" placeholder="254712345678">
+    </div>
+    <div class="field"><label>Note</label>
+      <input id="modal-note" placeholder="Internal note">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-sm btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn-sm btn-primary" onclick="updateOrder()">Update</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const TOKEN = localStorage.getItem('sf_token') || '';
+if (!TOKEN) window.location.href = '/login.html';
+
+let allOrders  = [];
+let allClients = [];
+let statsData  = {};
+let configData = {};
+let _editOrderId = '';
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, {
+    headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json', ...(opts.headers||{}) },
+    ...opts
+  });
+  if (r.status === 401) { logout(); return null; }
+  return r.json();
+}
+
+function toast(msg, ok = true) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.borderColor = ok ? 'var(--accent)' : 'var(--danger)';
+  t.style.color       = ok ? 'var(--accent)' : 'var(--danger)';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function fmtKES(n) { return 'KES ' + Number(n||0).toLocaleString('en-KE'); }
+function fmtDate(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleDateString('en-KE', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+}
+function badge(status) {
+  return `<span class="badge ${status}">${(status||'').replace(/_/g,' ')}</span>`;
+}
+
+/* ── Load everything ─────────────────────────────── */
+async function refreshAll() {
+  statsData  = await api('/api/admin/stats')  || {};
+  allOrders  = await api('/api/admin/orders') || [];
+  allClients = await api('/api/admin/clients')|| [];
+  configData = await api('/api/admin/config') || {};
+
+  renderStats();
+  renderRecentOrders();
+  renderOrders();
+  renderClients();
+  renderAnalytics();
+  renderConfig();
+
+  document.getElementById('biz-name').textContent = configData.name || 'Your Business';
+}
+
+function renderStats() {
+  document.getElementById('st-orders').textContent  = statsData.ordersToday  || 0;
+  document.getElementById('st-rev').textContent     = fmtKES(statsData.revenueToday);
+  document.getElementById('st-clients').textContent = statsData.totalClients  || 0;
+  document.getElementById('st-mrr').textContent     = fmtKES(statsData.mrr);
+}
+
+function renderRecentOrders() {
+  const tbody = document.getElementById('recent-orders');
+  const rows  = [...allOrders].slice(0, 10);
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">No orders yet</td></tr>'; return; }
+  tbody.innerHTML = rows.map(o => `
+    <tr>
+      <td><code style="color:var(--accent);font-size:12px">${o.orderId||o.id}</code></td>
+      <td>${o.customerName||'—'}</td>
+      <td style="font-size:12px;color:var(--muted)">${(o.cart||[]).map(i=>i.name+'×'+i.qty).join(', ').slice(0,40)}</td>
+      <td>${fmtKES(o.total)}</td>
+      <td>${badge(o.status)}</td>
+      <td style="color:var(--muted);font-size:12px">${fmtDate(o.createdAt)}</td>
+      <td><button class="btn-sm btn-outline" onclick="openModal('${o.orderId||o.id}','${o.status}')">Edit</button></td>
+    </tr>`).join('');
+}
+
+function renderOrders() {
+  const filter = document.getElementById('order-filter').value;
+  const tbody  = document.getElementById('all-orders');
+  let rows = [...allOrders];
+  if (filter) rows = rows.filter(o => o.status === filter);
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">No orders found</td></tr>'; return; }
+  tbody.innerHTML = rows.map(o => `
+    <tr>
+      <td><code style="color:var(--accent);font-size:12px">${o.orderId||o.id}</code></td>
+      <td>${o.customerName||'—'}<br><span style="color:var(--muted);font-size:11px">${o.customerPhone||''}</span></td>
+      <td style="font-size:12px;color:var(--muted);max-width:150px;overflow:hidden;text-overflow:ellipsis">${o.deliveryAddress||'—'}</td>
+      <td>${fmtKES(o.total)}</td>
+      <td>${badge(o.status)}</td>
+      <td style="color:var(--muted);font-size:12px">${fmtDate(o.createdAt)}</td>
+      <td><button class="btn-sm btn-outline" onclick="openModal('${o.orderId||o.id}','${o.status}')">Update</button></td>
+    </tr>`).join('');
+}
+
+function renderClients() {
+  const tbody = document.getElementById('clients-body');
+  if (!allClients.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">No clients yet</td></tr>'; return; }
+  tbody.innerHTML = allClients.map(c => `
+    <tr>
+      <td>${c.name||'Unknown'}</td>
+      <td><code style="color:var(--accent2);font-size:12px">${c.phone||c.id}</code></td>
+      <td>${c.orderCount||0}</td>
+      <td style="color:var(--muted);font-size:12px">${fmtDate(c.lastOrderAt)}</td>
+      <td><a href="https://wa.me/${(c.phone||c.id).replace('+','')}" target="_blank" class="btn-sm btn-outline" style="text-decoration:none;display:inline-block">💬 Chat</a></td>
+    </tr>`).join('');
+}
+
+function renderAnalytics() {
+  const stats = (statsData.recentStats || []).slice(0, 14).reverse();
+  const chart = document.getElementById('rev-chart');
+  if (!stats.length) { chart.innerHTML = '<div class="empty" style="width:100%">No data yet</div>'; return; }
+
+  const maxRev = Math.max(...stats.map(s => s.revenue || 0), 1);
+  chart.innerHTML = stats.map(s => {
+    const pct = Math.max(4, Math.round(((s.revenue||0)/maxRev)*100));
+    const label = (s.date||'').slice(5);
+    return `<div class="bar-col">
+      <div style="font-size:9px;color:var(--muted);margin-bottom:2px">${fmtKES(s.revenue||0).replace('KES ','')}</div>
+      <div class="bar" style="height:${pct}%"></div>
+      <div class="bar-label">${label}</div>
+    </div>`;
+  }).join('');
+
+  const sumCont = document.getElementById('analytics-summary');
+  const totalRev = stats.reduce((s,d)=>s+(d.revenue||0),0);
+  const totalOrd = stats.reduce((s,d)=>s+(d.ordersCount||0),0);
+  const avgOrd   = totalOrd ? Math.round(totalRev/totalOrd) : 0;
+  sumCont.innerHTML = `
+    <div class="stat-card"><div class="stat-label">14-Day Revenue</div><div class="stat-val">${fmtKES(totalRev)}</div></div>
+    <div class="stat-card"><div class="stat-label">14-Day Orders</div><div class="stat-val">${totalOrd}</div></div>
+    <div class="stat-card"><div class="stat-label">Avg Order Value</div><div class="stat-val">${fmtKES(avgOrd)}</div></div>
+    <div class="stat-card"><div class="stat-label">Total Clients</div><div class="stat-val">${allClients.length}</div></div>
+  `;
+}
+
+function renderConfig() {
+  document.getElementById('cfg-name').value    = configData.name      || '';
+  document.getElementById('cfg-sector').value  = configData.sector    || 'water';
+  document.getElementById('cfg-greeting').value= configData.greeting  || '';
+  document.getElementById('cfg-support').value = configData.supportPhone || '';
+  document.getElementById('cfg-till').value    = configData.mpesaTill  || '';
+  document.getElementById('cfg-shortcode').value=configData.mpesaShortcode||'';
+}
+
+async function saveConfig() {
+  const body = {
+    name:           document.getElementById('cfg-name').value,
+    sector:         document.getElementById('cfg-sector').value,
+    greeting:       document.getElementById('cfg-greeting').value,
+    supportPhone:   document.getElementById('cfg-support').value,
+    mpesaTill:      document.getElementById('cfg-till').value,
+    mpesaShortcode: document.getElementById('cfg-shortcode').value,
+  };
+  const r = await api('/api/admin/config', { method:'POST', body:JSON.stringify(body) });
+  if (r?.ok) toast('Configuration saved!');
+  else toast('Save failed', false);
+}
+
+/* ── Modal ───────────────────────────────────────── */
+function openModal(orderId, status) {
+  _editOrderId = orderId;
+  document.getElementById('modal-order-id').textContent = orderId;
+  document.getElementById('modal-status').value = status || '';
+  document.getElementById('modal-driver').value = '';
+  document.getElementById('modal-note').value   = '';
+  document.getElementById('order-modal').classList.add('open');
+}
+function closeModal() { document.getElementById('order-modal').classList.remove('open'); }
+
+async function updateOrder() {
+  const body = {
+    status:      document.getElementById('modal-status').value,
+    driverPhone: document.getElementById('modal-driver').value,
+    note:        document.getElementById('modal-note').value,
+  };
+  const r = await api(`/api/admin/orders/${_editOrderId}/status`, { method:'PATCH', body:JSON.stringify(body) });
+  if (r?.ok) {
+    toast('Order updated!');
+    closeModal();
+    await refreshAll();
+  } else {
+    toast('Update failed', false);
+  }
+}
+
+/* ── Navigation ──────────────────────────────────── */
+const sections = { dashboard:'sec-dashboard', orders:'sec-orders', clients:'sec-clients', analytics:'sec-analytics', config:'sec-config', setup:'sec-setup' };
+const titles   = { dashboard:'Dashboard', orders:'Orders', clients:'Clients', analytics:'Analytics', config:'Configuration', setup:'Deployment Guide' };
+
+function nav(key) {
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(l=>l.classList.remove('active'));
+  document.getElementById(sections[key]).classList.add('active');
+  document.querySelectorAll('.nav-link').forEach(l=>{ if(l.textContent.trim().toLowerCase().includes(key.slice(0,4))) l.classList.add('active'); });
+  document.getElementById('page-title').textContent = titles[key];
+}
+
+function logout() {
+  localStorage.removeItem('sf_token');
+  window.location.href = '/login.html';
+}
+
+/* ── Init ─────────────────────────────────────────── */
+refreshAll();
+setInterval(refreshAll, 30000); // auto-refresh every 30s
+</script>
+</body>
+</html>

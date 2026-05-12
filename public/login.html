@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SupplyFlow V6 — Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0a0f1e;--card:#111827;--border:#1e2d45;
+    --accent:#00e5a0;--accent2:#0ea5e9;
+    --text:#f0f4ff;--muted:#8892a4;
+    --danger:#f43f5e;
+  }
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);
+    min-height:100vh;display:flex;align-items:center;justify-content:center;
+    background-image:radial-gradient(ellipse 80% 50% at 50% -20%,rgba(0,229,160,.12),transparent)}
+  .wrap{width:100%;max-width:400px;padding:20px}
+  .logo{text-align:center;margin-bottom:40px}
+  .logo h1{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .logo p{color:var(--muted);font-size:13px;margin-top:4px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px}
+  .card h2{font-family:'Syne',sans-serif;font-size:20px;margin-bottom:24px}
+  label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+  input{width:100%;padding:12px 14px;background:#0a0f1e;border:1px solid var(--border);
+    border-radius:10px;color:var(--text);font-size:14px;font-family:'DM Sans',sans-serif;
+    outline:none;transition:.2s}
+  input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,229,160,.1)}
+  .field{margin-bottom:18px}
+  .btn{width:100%;padding:13px;background:var(--accent);color:#000;font-weight:700;
+    font-size:15px;border:none;border-radius:10px;cursor:pointer;
+    font-family:'DM Sans',sans-serif;transition:.15s;margin-top:8px}
+  .btn:hover{opacity:.9;transform:translateY(-1px)}
+  .btn:active{transform:translateY(0)}
+  .err{color:var(--danger);font-size:13px;margin-top:12px;text-align:center;display:none}
+  .spinner{display:none;width:18px;height:18px;border:2px solid rgba(0,0,0,.3);
+    border-top-color:#000;border-radius:50%;animation:spin .6s linear infinite;
+    margin:0 auto}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .badge{display:inline-block;background:rgba(0,229,160,.15);color:var(--accent);
+    font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;margin-bottom:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">
+    <h1>⚡ SupplyFlow</h1>
+    <p>Universal WhatsApp Commerce Platform</p>
+  </div>
+  <div class="card">
+    <span class="badge">V6 Universal</span>
+    <h2>Admin Login</h2>
+    <div class="field">
+      <label>Email Address</label>
+      <input type="email" id="email" placeholder="admin@yourbusiness.com" autocomplete="email">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn" onclick="login()">Sign In</button>
+    <div class="spinner" id="spin"></div>
+    <div class="err" id="err">Invalid credentials. Please try again.</div>
+  </div>
+</div>
+<script>
+async function login() {
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const err = document.getElementById('err');
+  const spin = document.getElementById('spin');
+  err.style.display = 'none';
+  spin.style.display = 'block';
+  try {
+    const r = await fetch('/api/auth/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email, password })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      localStorage.setItem('sf_token', d.token);
+      window.location.href = '/admin.html';
+    } else {
+      err.style.display = 'block';
+    }
+  } catch(e) {
+    err.style.display = 'block';
+  }
+  spin.style.display = 'none';
+}
+document.addEventListener('keydown', e => e.key === 'Enter' && login());
+</script>
+</body>
+</html>
