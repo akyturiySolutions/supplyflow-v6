@@ -379,6 +379,7 @@ function badge(status) {
 }
 
 /* ── Load everything ─────────────────────────────── */
+HEAD
 // Read bizId from URL e.g. ?bizId=296847823456001
 const URL_BIZ_ID = new URLSearchParams(window.location.search).get('bizId') || '';
 
@@ -388,6 +389,13 @@ async function refreshAll() {
   allOrders  = await api(/api/admin/orders${q})  || [];
   allClients = await api(/api/admin/clients${q}) || [];
   configData = await api(/api/admin/config${q})  || {};
+  
+async function refreshAll() {
+  statsData  = await api('/api/admin/stats')  || {};
+  allOrders  = await api('/api/admin/orders') || [];
+  allClients = await api('/api/admin/clients')|| [];
+  configData = await api('/api/admin/config') || {};
+  e6b5b29fbaf9e5a3a1639c99d820a6177a39aea7
 
   renderStats();
   renderRecentOrders();
