@@ -38,7 +38,8 @@ app.get('/webhook', (req, res) => {
 });
 
 /* ── WhatsApp Webhook events (POST) ──────────────────────────── */
-app.post('/webhook', async (req, res) => {
+console.log(`[DEBUG] webhook body:`, JSON.stringify(req.body).slice(0, 500));
+//app.post('/webhook', async (req, res) => {
   // Acknowledge immediately (Meta requires <5s)
   res.sendStatus(200);
 
