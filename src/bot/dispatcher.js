@@ -24,7 +24,7 @@ async function handleIncomingMessage(msg, metadata, contact) {
   const from    = msg.from;
   const phoneId = metadata.phone_number_id;
   const name    = contact?.profile?.name || 'Customer';
-  const bizId   = process.env.BUSINESS_ID || phoneId;
+  const bizId   = phoneId;
 
   // Mark as read (fire-and-forget — don't block on failure)
   markRead(phoneId, msg.id).catch(() => {});
