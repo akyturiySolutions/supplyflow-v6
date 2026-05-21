@@ -86,7 +86,9 @@ const _bizCache = new Map();
 
 async function getBusinessConfig(bizId) {
   if (_bizCache.has(bizId)) return _bizCache.get(bizId);
+  console.log('[Firestore] Looking up bizId:', bizId);
   const biz    = await fsGet('businesses', bizId);
+  console.log('[Firestore] Result:', biz ? biz.name : 'NOT FOUND — using defaults');
   const result = biz || getDefaultBizConfig(bizId);
   _bizCache.set(bizId, result);
   setTimeout(() => _bizCache.delete(bizId), 5 * 60 * 1000);
