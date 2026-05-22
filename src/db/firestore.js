@@ -23,12 +23,29 @@ function initFirestore() {
   if (db) return db;
   try {
     const admin  = require('firebase-admin');
-    const config = JSON.parse(process.env.FIREBASE_CONFIG || '{}');
+    const raw    = process.env.FIREBASE_CONFIG || '{}';
+    const config = JSON.parse(raw);
+
+    // FIX: Render sometimes passes \n as literal string instead of newline.
+    // Force-convert the private key so Firebase Admin can parse it correctly.
+    if (config.private_key) {
+      config.private_key = config.private_key.replace(/\\n/g, '\n');
+    }
+
+    console.log('[Firestore] project_id:', config.project_id || 'NOT SET');
+    console.log('[Firestore] client_email:', config.client_email || 'NOT SET');
+
     if (!admin.apps.length && config.project_id) {
       admin.initializeApp({ credential: admin.credential.cert(config) });
+      console.log('[Firestore] ✅ Initialized successfully');
     }
+
     db = admin.apps.length ? admin.firestore() : null;
-  } catch (_) {
+
+    if (!db) console.error('[Firestore] ❌ Failed to get Firestore instance');
+
+  } catch (err) {
+    console.error('[Firestore] ❌ Init error:', err.message);
     db = null;
   }
   return db;
