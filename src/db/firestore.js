@@ -19,33 +19,49 @@
 
 let db = null;
 
-function initFirestore() {
+unction initFirestore() {
   if (db) return db;
   try {
-    const admin  = require('firebase-admin');
-    const raw    = process.env.FIREBASE_CONFIG || '{}';
-    const config = JSON.parse(raw);
+    const admin = require('firebase-admin');
 
-    // FIX: Render sometimes passes \n as literal string instead of newline.
-    // Force-convert the private key so Firebase Admin can parse it correctly.
-    if (config.private_key) {
-      config.private_key = config.private_key.replace(/\\n/g, '\n');
+    // Method 1: Three separate env vars (most reliable on Render)
+    const projectId   = process.env.FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    const privateKey  = (process.env.FIREBASE_PRIVATE_KEY || '')
+                          .replace(/\\n/g, '\n');
+
+    // Method 2: Full JSON fallback
+    let credential;
+    if (projectId && clientEmail && privateKey) {
+      console.log('[Firestore] Using individual env vars');
+      console.log('[Firestore] project_id:', projectId);
+      console.log('[Firestore] client_email:', clientEmail);
+      credential = admin.credential.cert({
+        projectId,
+        clientEmail,
+        privateKey,
+      });
+    } else {
+      console.log('[Firestore] Using FIREBASE_CONFIG JSON');
+      const raw    = process.env.FIREBASE_CONFIG || '{}';
+      const config = JSON.parse(raw);
+      if (config.private_key) {
+        config.private_key = config.private_key.replace(/\\n/g, '\n');
+      }
+      console.log('[Firestore] project_id:', config.project_id);
+      credential = admin.credential.cert(config);
     }
 
-    console.log('[Firestore] project_id:', config.project_id || 'NOT SET');
-    console.log('[Firestore] client_email:', config.client_email || 'NOT SET');
-
-    if (!admin.apps.length && config.project_id) {
-      admin.initializeApp({ credential: admin.credential.cert(config) });
-      console.log('[Firestore] ✅ Initialized successfully');
+    if (!admin.apps.length) {
+      admin.initializeApp({ credential });
+      console.log('[Firestore] ✅ Firebase initialized');
     }
 
-    db = admin.apps.length ? admin.firestore() : null;
-
-    if (!db) console.error('[Firestore] ❌ Failed to get Firestore instance');
+    db = admin.firestore();
+    console.log('[Firestore] ✅ Firestore connected');
 
   } catch (err) {
-    console.error('[Firestore] ❌ Init error:', err.message);
+    console.error('[Firestore] ❌ Error:', err.message);
     db = null;
   }
   return db;
