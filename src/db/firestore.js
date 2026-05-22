@@ -19,7 +19,7 @@
 
 let db = null;
 
-unction initFirestore() {
+function initFirestore() {
   if (db) return db;
   try {
     const admin = require('firebase-admin');
