@@ -1,145 +1,115 @@
 /**
- * Bot Dispatcher
- * Routes incoming WhatsApp messages to the correct conversation flow.
- * Supports: text, interactive (buttons/lists), and location messages.
- *
- * PATCHED:
- *  - _lastInput now correctly set from current message BEFORE routing
- *  - MAIN_MENU routes immediately on button press (no second-message needed)
- *  - BROWSING no longer double-renders catalogue on first ADD_ input
- *  - TYPING_ADDRESS wired into the routing switch
+ * Bot Dispatcher - V6.1 Final
  */
+
 const { sendMessage, sendInteractive, markRead } = require('./whatsapp');
-const { getSession, setSession, clearSession }   = require('./session');
-const { getBusinessConfig }                       = require('../db/firestore');
+const { getSession, setSession }                 = require('./session');
+const { getBusinessConfig }                      = require('../db/firestore');
 const orderFlow   = require('./flows/orderFlow');
 const trackFlow   = require('./flows/trackFlow');
 const supportFlow = require('./flows/supportFlow');
 
-/**
- * Entry point called by server.js for every incoming message.
- */
 async function handleIncomingMessage(msg, metadata, contact) {
   const from    = msg.from;
   const phoneId = metadata.phone_number_id;
   const name    = contact?.profile?.name || 'Customer';
-  const bizId   = process.env.BUSINESS_ID || phoneId;
+  const bizId   = phoneId;
 
-  // Mark as read (fire-and-forget — don't block on failure)
   markRead(phoneId, msg.id).catch(() => {});
 
-  // Load business config
   const biz = await getBusinessConfig(bizId);
 
-  // Load or create session
   let session = await getSession(from);
   if (!session) {
     session = { from, name, bizId, step: 'MAIN_MENU', cart: [], createdAt: Date.now() };
   }
 
-  // ── Extract message content ──────────────────────────────────
   const { type } = msg;
-  let text   = '';
-  let btnId  = '';
-  let listId = '';
+  let text = '', btnId = '', listId = '';
 
   if (type === 'text') {
     text = (msg.text?.body || '').trim();
   } else if (type === 'interactive') {
     const ia = msg.interactive;
-    if (ia.type === 'button_reply') btnId = ia.button_reply.id;
+    if (ia.type === 'button_reply') btnId  = ia.button_reply.id;
     if (ia.type === 'list_reply')   listId = ia.list_reply.id;
   } else if (type === 'location') {
-    // Attach location to session so flows can read it
     session = { ...session, location: msg.location };
   }
 
-  // FIX: _lastInput is the CURRENT message's input — set it here, not inside showMainMenu
   const input = btnId || listId || text;
   session = { ...session, _lastInput: input };
 
-  console.log(`[Bot] ${from} | step=${session.step} | input="${input.slice(0, 60)}"`);
+  console.log('[Bot]', from, '| step=' + session.step, '| input="' + input.slice(0, 60) + '"');
 
-  // ── Global reset commands (work from any step) ───────────────
+  // Global reset commands
   const lower = text.toLowerCase();
-  if (['menu', 'hi', 'hei', 'hello', 'start', '0', 'back', 'cancel'].includes(lower)) {
+  if (['menu','hi','hei','hello','start','0','back','cancel'].includes(lower)) {
     session = { ...session, step: 'MAIN_MENU', cart: [] };
   }
 
-  // ── Rate limiting (simple per-number, in-memory) ─────────────
+  // Rate limiter
   if (isRateLimited(from)) {
-    await sendMessage(phoneId, from, '⏳ Please slow down — send one message at a time.');
+    await sendMessage(phoneId, from, 'Please slow down — one message at a time.');
     return;
   }
 
-  // ── Route by step ────────────────────────────────────────────
   let nextSession = session;
-
   try {
     switch (session.step) {
-
-      // FIX: MAIN_MENU now acts immediately on the current input
       case 'MAIN_MENU':
         nextSession = await handleMainMenu(phoneId, session, input, biz);
         break;
-
-      // FIX: BROWSING and TYPING_ADDRESS explicitly separated
       case 'BROWSING':
+      case 'CATEGORY_ITEMS':
       case 'ADD_TO_CART':
       case 'CART_REVIEW':
       case 'DELIVERY_DETAILS':
-      case 'TYPING_ADDRESS':        // ← was missing from switch
+      case 'TYPING_ADDRESS':
       case 'PAYMENT_CHOICE':
       case 'AWAITING_PAYMENT':
-      case 'ORDER_CONFIRM':
         nextSession = await orderFlow.handle(phoneId, session, input, biz);
         break;
-
       case 'TRACKING':
         nextSession = await trackFlow.handle(phoneId, session, input, biz);
         break;
-
       case 'SUPPORT':
         nextSession = await supportFlow.handle(phoneId, session, input, biz);
         break;
-
       default:
         nextSession = await handleMainMenu(phoneId, session, '', biz);
     }
   } catch (err) {
-    console.error(`[Dispatcher] Unhandled error for ${from}:`, err);
-    await sendMessage(phoneId, from,
-      '⚠️ Something went wrong on our end. Please try again or type *menu* to restart.');
+    console.error('[Dispatcher] Error for', from, ':', err.message);
+    await sendMessage(phoneId, from, 'Something went wrong. Type menu to restart.');
     nextSession = { ...session, step: 'MAIN_MENU' };
   }
 
   await setSession(from, nextSession);
 }
 
-// ── Main Menu ────────────────────────────────────────────────────
-// FIX: takes `input` as a parameter — no longer reads stale session._lastInput
 async function handleMainMenu(phoneId, session, input, biz) {
-  // Route immediately and call the flow to display the screen
+  // Route immediately on button press and show the screen
   if (input === 'ORDER') {
-    const nextSession = { ...session, step: 'BROWSING' };
-    return await orderFlow.handle(phoneId, nextSession, '', biz);
+    const next = { ...session, step: 'BROWSING' };
+    return await orderFlow.handle(phoneId, next, '', biz);
   }
   if (input === 'TRACK') {
-    const nextSession = { ...session, step: 'TRACKING' };
-    return await trackFlow.handle(phoneId, nextSession, '', biz);
+    const next = { ...session, step: 'TRACKING' };
+    return await trackFlow.handle(phoneId, next, '', biz);
   }
   if (input === 'SUPPORT') {
-    const nextSession = { ...session, step: 'SUPPORT' };
-    return await supportFlow.handle(phoneId, nextSession, '', biz);
+    const next = { ...session, step: 'SUPPORT' };
+    return await supportFlow.handle(phoneId, next, '', biz);
   }
 
   // Show main menu
-  const bizName  = biz?.name    || 'SupplyFlow';
-  const greeting = biz?.greeting || Welcome to *${bizName}*! 🏪\nHow can we help you today?;
+  const bizName  = biz?.name || 'SupplyFlow';
+  const greeting = biz?.greeting || ('Welcome to *' + bizName + '*! How can we help you today?');
 
   await sendInteractive(phoneId, session.from, {
     type: 'button',
-    body: { text: ${greeting}\n\nReply *menu* anytime to restart. },
+    body: { text: greeting + '\n\nReply *menu* anytime to restart.' },
     action: {
       buttons: [
         { type: 'reply', reply: { id: 'ORDER',   title: '🛒 Place Order' } },
@@ -151,19 +121,17 @@ async function handleMainMenu(phoneId, session, input, biz) {
   return { ...session, step: 'MAIN_MENU' };
 }
 
-// ── Simple rate limiter (max 3 msgs / 2 seconds per number) ─────
+// Rate limiter
 const _rateBuckets = new Map();
 function isRateLimited(from) {
-  const now    = Date.now();
-  const window = 2000;
-  const max    = 3;
-  const hits   = (_rateBuckets.get(from) || []).filter(t => now - t < window);
+  const now = Date.now(), window = 2000, max = 3;
+  const hits = (_rateBuckets.get(from) || []).filter(function(t) { return now - t < window; });
   hits.push(now);
   _rateBuckets.set(from, hits);
   if (_rateBuckets.size > 5000) {
-    // Prevent unbounded growth
-    const oldest = [..._rateBuckets.entries()].sort((a, b) => a[1][0] - b[1][0]);
-    oldest.slice(0, 1000).forEach(([k]) => _rateBuckets.delete(k));
+    var oldest = [];
+    _rateBuckets.forEach(function(v, k) { oldest.push([k, v[0]]); });
+    oldest.sort(function(a,b){ return a[1]-b[1]; }).slice(0,1000).forEach(function(x){ _rateBuckets.delete(x[0]); });
   }
   return hits.length > max;
 }
