@@ -76,23 +76,35 @@ async function handle(phoneId, session, input, biz) {
       }
 
       // Page 2 of a category
-      if (input.startsWith('MORE_')) {
-        const catId = input.replace('MORE_', '');
-        const items = biz.products.filter(p => p.category === catId);
-        const rows  = items.slice(10, 20).map(p => ({
-          id:          `ADD_${p.id}`,
-          title:       p.name.slice(0, 24),
-          description: `${formatKES(p.price)} — ${p.description || ''}`.slice(0, 72)
-        }));
+     if (input.startsWith('MORE_')) {
+	const parts  = input.split('_');
+	const page   = parseInt(parts[parts.length - 1], 10) || 0;
+	const catId  = parts.slice(1, -1).join('_');
+	const items  = biz.products.filter(p => p.category === catId);
+	const start  = 9 + (page * 9);
+	const end    = start + 9;
+	const rows   = items.slice(start, end).map(p => ({
+		id:          ADD_${p.id},
+		title:       p.name.slice(0, 24),
+		description: ${formatKES(p.price)} — ${p.description || ''}.slice(0, 72)
+	}));
 
-        await sendInteractive(phoneId, session.from, {
-          type: 'list',
-          body: { text: `More items:` },
-          footer: { text: 'Reply *menu* to restart' },
-          action: { button: 'Choose Item', sections: [{ title: 'More Items', rows }] }
-        });
-        return { ...session, step: 'CATEGORY_ITEMS', _currentCat: catId };
-      }
+  if (items.length > end) {
+    rows.push({
+      id:          MORE_${catId}_${page + 1},
+      title:       'See More Items',
+      description: ${items.length - end} more items
+    });
+  }
+
+  await sendInteractive(phoneId, session.from, {
+    type: 'list',
+    body: { text: More items — page ${page + 2}: },
+    footer: { text: 'Reply menu to restart' },
+    action: { button: 'Choose Item', sections: [{ title: 'More Items', rows }] }
+  });
+  return { ...session, step: 'CATEGORY_ITEMS', _currentCat: catId };
+}
 
       // Category selected — show its products
       if (input.startsWith('CAT_')) {
@@ -105,12 +117,20 @@ async function handle(phoneId, session, input, biz) {
           return handle(phoneId, { ...session, step: 'BROWSING' }, '', biz);
         }
 
-        const rows = items.slice(0, 10).map(p => ({
-          id:          `ADD_${p.id}`,
-          title:       p.name.slice(0, 24),
-          description: `${formatKES(p.price)} — ${p.description || ''}`.slice(0, 72)
-        }));
+        const maxRows = 9; // Leave room for "See More" row
+		const rows = items.slice(0, maxRows).map(p => ({
+			id:          ADD_${p.id},
+			title:       p.name.slice(0, 24),
+			description: ${formatKES(p.price)} — ${p.description || ''}.slice(0, 72)
+		}));
 
+if (items.length > maxRows) {
+  rows.push({
+    id:          MORE_${catId}_0,
+    title:       'See More Items',
+    description: ${items.length - maxRows} more items available
+  });
+}
         if (items.length > 10) {
           rows.push({
             id:          `MORE_${catId}`,
