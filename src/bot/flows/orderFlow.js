@@ -22,6 +22,10 @@ async function handle(phoneId, session, input, biz) {
     /* ── 1. BROWSING — show categories or flat product list ── */
     case 'BROWSING': {
       // Delegate immediately if input already has a selection
+	  console.log('[OrderFlow] BROWSING | isCategorised:', isCategorised, '| categories:', biz.categories?.length, '| products:', biz.products?.length);
+
+  if (input.startsWith('CAT_')) return handle(phoneId, { ...session, step: 'CATEGORY_ITEMS' }, input, biz);
+  if (input.startsWith('ADD_')) return handle(phoneId, { ...session, step: 'ADD_TO_CART' }, input, biz);
       if (input.startsWith('CAT_')) return handle(phoneId, { ...session, step: 'CATEGORY_ITEMS' }, input, biz);
       if (input.startsWith('ADD_')) return handle(phoneId, { ...session, step: 'ADD_TO_CART' }, input, biz);
 
