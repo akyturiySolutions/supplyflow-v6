@@ -9,7 +9,9 @@
  *  - BROWSING no longer double-renders catalogue on first ADD_ input
  *  - TYPING_ADDRESS wired into the routing switch
  */
-
+const orderFlow   = require('./flows/orderFlow');
+const trackFlow   = require('./flows/trackFlow');
+const supportFlow = require('./flows/supportFlow');
 const { sendMessage, sendInteractive, markRead } = require('./whatsapp');
 const { getSession, setSession, clearSession }   = require('./session');
 const { getBusinessConfig }                       = require('../db/firestore');
@@ -24,7 +26,7 @@ async function handleIncomingMessage(msg, metadata, contact) {
   const from    = msg.from;
   const phoneId = metadata.phone_number_id;
   const name    = contact?.profile?.name || 'Customer';
-  const bizId   = phoneId;
+  const bizId   = process.env.BUSINESS_ID || phoneId;
 
   // Mark as read (fire-and-forget — don't block on failure)
   markRead(phoneId, msg.id).catch(() => {});
@@ -120,18 +122,27 @@ async function handleIncomingMessage(msg, metadata, contact) {
 // ── Main Menu ────────────────────────────────────────────────────
 // FIX: takes `input` as a parameter — no longer reads stale session._lastInput
 async function handleMainMenu(phoneId, session, input, biz) {
-  // If the customer pressed a menu button, route immediately — no second message needed
-  if (input === 'ORDER')   return { ...session, step: 'BROWSING'  };
-  if (input === 'TRACK')   return { ...session, step: 'TRACKING'  };
-  if (input === 'SUPPORT') return { ...session, step: 'SUPPORT'   };
+  // Route immediately and call the flow to display the screen
+  if (input === 'ORDER') {
+    const nextSession = { ...session, step: 'BROWSING' };
+    return await orderFlow.handle(phoneId, nextSession, '', biz);
+  }
+  if (input === 'TRACK') {
+    const nextSession = { ...session, step: 'TRACKING' };
+    return await trackFlow.handle(phoneId, nextSession, '', biz);
+  }
+  if (input === 'SUPPORT') {
+    const nextSession = { ...session, step: 'SUPPORT' };
+    return await supportFlow.handle(phoneId, nextSession, '', biz);
+  }
 
-  // Otherwise show the menu
+  // Show main menu
   const bizName  = biz?.name    || 'SupplyFlow';
-  const greeting = biz?.greeting || `Welcome to *${bizName}*! 🏪\nHow can we help you today?`;
+  const greeting = biz?.greeting || Welcome to *${bizName}*! 🏪\nHow can we help you today?;
 
   await sendInteractive(phoneId, session.from, {
     type: 'button',
-    body: { text: `${greeting}\n\nReply *menu* at any time to restart.` },
+    body: { text: ${greeting}\n\nReply *menu* anytime to restart. },
     action: {
       buttons: [
         { type: 'reply', reply: { id: 'ORDER',   title: '🛒 Place Order' } },
@@ -140,7 +151,6 @@ async function handleMainMenu(phoneId, session, input, biz) {
       ]
     }
   });
-
   return { ...session, step: 'MAIN_MENU' };
 }
 
