@@ -9,9 +9,6 @@
  *  - BROWSING no longer double-renders catalogue on first ADD_ input
  *  - TYPING_ADDRESS wired into the routing switch
  */
-const orderFlow   = require('./flows/orderFlow');
-const trackFlow   = require('./flows/trackFlow');
-const supportFlow = require('./flows/supportFlow');
 const { sendMessage, sendInteractive, markRead } = require('./whatsapp');
 const { getSession, setSession, clearSession }   = require('./session');
 const { getBusinessConfig }                       = require('../db/firestore');
