@@ -1,11 +1,6 @@
 /**
- * orderFlow.js — Fixed & Universal
- * Handles flat menus (water, gas, milk) and categorised menus (hotels, restaurants)
- *
- * FIXED:
- *  - Duplicate CATEGORY_ITEMS case removed — was breaking all button responses
- *  - Pagination merged into single CATEGORY_ITEMS handler
- *  - BROWSING correctly delegates without double-render
+ * orderFlow.js — Fixed with proper pagination
+ * WhatsApp list max = 10 rows. Categories with more than 9 items use pagination.
  */
 
 const { sendMessage, sendInteractive, requestLocation } = require('../whatsapp');
@@ -19,163 +14,141 @@ async function handle(phoneId, session, input, biz) {
 
   switch (session.step) {
 
-    /* ── 1. BROWSING — show categories or flat product list ── */
     case 'BROWSING': {
-      // Delegate immediately if input already has a selection
-	  console.log('[OrderFlow] BROWSING | isCategorised:', isCategorised, '| categories:', biz.categories?.length, '| products:', biz.products?.length);
+      console.log('[OrderFlow] BROWSING | isCategorised:', isCategorised, '| categories:', biz.categories && biz.categories.length, '| products:', biz.products && biz.products.length);
 
-  if (input.startsWith('CAT_')) return handle(phoneId, { ...session, step: 'CATEGORY_ITEMS' }, input, biz);
-  if (input.startsWith('ADD_')) return handle(phoneId, { ...session, step: 'ADD_TO_CART' }, input, biz);
       if (input.startsWith('CAT_')) return handle(phoneId, { ...session, step: 'CATEGORY_ITEMS' }, input, biz);
       if (input.startsWith('ADD_')) return handle(phoneId, { ...session, step: 'ADD_TO_CART' }, input, biz);
 
       if (isCategorised) {
-        const rows = biz.categories.map(c => ({
-          id:          `CAT_${c.id}`,
-          title:       c.name.slice(0, 24),
-          description: `${biz.products.filter(p => p.category === c.id).length} items available`
-        }));
+        var catRows = biz.categories.map(function(c) {
+          var count = biz.products.filter(function(p) { return p.category === c.id; }).length;
+          return { id: 'CAT_' + c.id, title: c.name.slice(0, 24), description: count + ' items available' };
+        });
 
         await sendInteractive(phoneId, session.from, {
           type: 'list',
-          body: { text: `🍽️ *${biz.name}*\n\nChoose a category:` },
-          footer: { text: 'Reply *menu* to go back' },
-          action: { button: 'View Menu', sections: [{ title: 'Menu Categories', rows }] }
+          body: { text: '\uD83C\uDF7D\uFE0F *' + (biz.name || 'Our Menu') + '*\n\nChoose a category:' },
+          footer: { text: 'Reply menu to go back' },
+          action: { button: 'View Menu', sections: [{ title: 'Menu Categories', rows: catRows }] }
         });
 
       } else {
-        // Flat product list
-        const products = biz.products || getDefaultProducts(biz.sector);
-        const rows = products.slice(0, 10).map(p => ({
-          id:          `ADD_${p.id}`,
-          title:       p.name.slice(0, 24),
-          description: `${formatKES(p.price)} — ${p.description || ''}`.slice(0, 72)
-        }));
+        var products = biz.products || getDefaultProducts(biz.sector);
+        var prodRows = products.slice(0, 9).map(function(p) {
+          return {
+            id: 'ADD_' + p.id,
+            title: p.name.slice(0, 24),
+            description: (formatKES(p.price) + ' - ' + (p.description || '')).slice(0, 72)
+          };
+        });
 
         await sendInteractive(phoneId, session.from, {
           type: 'list',
-          body: { text: `🛒 *${biz.name}*\n\nSelect a product:` },
-          footer: { text: 'Reply *menu* to go back' },
-          action: { button: 'View Products', sections: [{ title: 'Products', rows }] }
+          body: { text: '\uD83D\uDED2 *' + (biz.name || 'Products') + '*\n\nSelect a product:' },
+          footer: { text: 'Reply menu to go back' },
+          action: { button: 'View Products', sections: [{ title: 'Products', rows: prodRows }] }
         });
       }
 
       return { ...session, step: 'BROWSING' };
     }
 
-    /* ── 2. CATEGORY_ITEMS — show products in chosen category ── */
     case 'CATEGORY_ITEMS': {
-      // Product selected — go to cart
-      if (input.startsWith('ADD_')) {
-        return handle(phoneId, { ...session, step: 'ADD_TO_CART' }, input, biz);
-      }
+      if (input.startsWith('ADD_')) return handle(phoneId, { ...session, step: 'ADD_TO_CART' }, input, biz);
+      if (input === 'BACK_TO_CATS') return handle(phoneId, { ...session, step: 'BROWSING' }, '', biz);
 
-      // Back to categories
-      if (input === 'BACK_TO_CATS') {
-        return handle(phoneId, { ...session, step: 'BROWSING' }, '', biz);
-      }
+      if (input.startsWith('MORE_')) {
+        var moreParts = input.split('_');
+        var morePage  = parseInt(moreParts[moreParts.length - 1], 10) || 0;
+        var moreCatId = moreParts.slice(1, -1).join('_');
+        var moreItems = biz.products.filter(function(p) { return p.category === moreCatId; });
+        var moreStart = 9 + (morePage * 9);
+        var moreEnd   = moreStart + 9;
+        var moreRows  = moreItems.slice(moreStart, moreEnd).map(function(p) {
+          return {
+            id: 'ADD_' + p.id,
+            title: p.name.slice(0, 24),
+            description: (formatKES(p.price) + ' - ' + (p.description || '')).slice(0, 72)
+          };
+        });
 
-      // Page 2 of a category
-     if (input.startsWith('MORE_')) {
-	const parts  = input.split('_');
-	const page   = parseInt(parts[parts.length - 1], 10) || 0;
-	const catId  = parts.slice(1, -1).join('_');
-	const items  = biz.products.filter(p => p.category === catId);
-	const start  = 9 + (page * 9);
-	const end    = start + 9;
-	const rows   = items.slice(start, end).map(p => ({
-		id:          ADD_${p.id},
-		title:       p.name.slice(0, 24),
-		description: ${formatKES(p.price)} — ${p.description || ''}.slice(0, 72)
-	}));
-
-  if (items.length > end) {
-    rows.push({
-      id:          MORE_${catId}_${page + 1},
-      title:       'See More Items',
-      description: ${items.length - end} more items
-    });
-  }
-
-  await sendInteractive(phoneId, session.from, {
-    type: 'list',
-    body: { text: More items — page ${page + 2}: },
-    footer: { text: 'Reply menu to restart' },
-    action: { button: 'Choose Item', sections: [{ title: 'More Items', rows }] }
-  });
-  return { ...session, step: 'CATEGORY_ITEMS', _currentCat: catId };
-}
-
-      // Category selected — show its products
-      if (input.startsWith('CAT_')) {
-        const catId    = input.replace('CAT_', '');
-        const category = biz.categories.find(c => c.id === catId);
-        const items    = biz.products.filter(p => p.category === catId);
-
-        if (!items.length) {
-          await sendMessage(phoneId, session.from, '⚠️ No items in this category. Please choose another.');
-          return handle(phoneId, { ...session, step: 'BROWSING' }, '', biz);
-        }
-
-        const maxRows = 9; // Leave room for "See More" row
-		const rows = items.slice(0, maxRows).map(p => ({
-			id:          ADD_${p.id},
-			title:       p.name.slice(0, 24),
-			description: ${formatKES(p.price)} — ${p.description || ''}.slice(0, 72)
-		}));
-
-if (items.length > maxRows) {
-  rows.push({
-    id:          MORE_${catId}_0,
-    title:       'See More Items',
-    description: ${items.length - maxRows} more items available
-  });
-}
-        if (items.length > 10) {
-          rows.push({
-            id:          `MORE_${catId}`,
-            title:       '➡️ See More Items',
-            description: `${items.length - 10} more items`
+        if (moreItems.length > moreEnd) {
+          moreRows.push({
+            id: 'MORE_' + moreCatId + '_' + (morePage + 1),
+            title: 'See More Items',
+            description: (moreItems.length - moreEnd) + ' more items'
           });
         }
 
         await sendInteractive(phoneId, session.from, {
           type: 'list',
-          body: { text: `${category?.name || catId}\n\nSelect an item:` },
-          footer: { text: 'Reply *menu* to restart' },
-          action: { button: 'Choose Item', sections: [{ title: category?.name || 'Items', rows }] }
+          body: { text: 'More items:' },
+          footer: { text: 'Reply menu to restart' },
+          action: { button: 'Choose Item', sections: [{ title: 'More Items', rows: moreRows }] }
+        });
+        return { ...session, step: 'CATEGORY_ITEMS', _currentCat: moreCatId };
+      }
+
+      if (input.startsWith('CAT_')) {
+        var catId    = input.replace('CAT_', '');
+        var category = biz.categories.find(function(c) { return c.id === catId; });
+        var items    = biz.products.filter(function(p) { return p.category === catId; });
+
+        if (!items.length) {
+          await sendMessage(phoneId, session.from, 'No items in this category. Please choose another.');
+          return handle(phoneId, { ...session, step: 'BROWSING' }, '', biz);
+        }
+
+        var rows = items.slice(0, 9).map(function(p) {
+          return {
+            id: 'ADD_' + p.id,
+            title: p.name.slice(0, 24),
+            description: (formatKES(p.price) + ' - ' + (p.description || '')).slice(0, 72)
+          };
+        });
+
+        if (items.length > 9) {
+          rows.push({
+            id: 'MORE_' + catId + '_0',
+            title: 'See More Items',
+            description: (items.length - 9) + ' more items available'
+          });
+        }
+
+        await sendInteractive(phoneId, session.from, {
+          type: 'list',
+          body: { text: (category ? category.name : catId) + '\n\nSelect an item:' },
+          footer: { text: 'Reply menu to restart' },
+          action: { button: 'Choose Item', sections: [{ title: category ? category.name : 'Items', rows: rows }] }
         });
 
         return { ...session, step: 'CATEGORY_ITEMS', _currentCat: catId };
       }
 
-      // Unknown input — go back to browsing
       return handle(phoneId, { ...session, step: 'BROWSING' }, '', biz);
     }
 
-    /* ── 3. ADD_TO_CART — choose quantity ───────────────────── */
     case 'ADD_TO_CART': {
-      if (!input.startsWith('ADD_')) {
-        return handle(phoneId, { ...session, step: 'BROWSING' }, '', biz);
-      }
+      if (!input.startsWith('ADD_')) return handle(phoneId, { ...session, step: 'BROWSING' }, '', biz);
 
-      const productId = input.replace('ADD_', '');
-      const allProds  = biz.products || getDefaultProducts(biz.sector);
-      const product   = allProds.find(p => p.id === productId);
+      var productId = input.replace('ADD_', '');
+      var allProds  = biz.products || getDefaultProducts(biz.sector);
+      var product   = allProds.find(function(p) { return p.id === productId; });
 
       if (!product) {
-        await sendMessage(phoneId, session.from, '⚠️ Item not found. Please try again.');
+        await sendMessage(phoneId, session.from, 'Item not found. Please try again.');
         return handle(phoneId, { ...session, step: 'BROWSING' }, '', biz);
       }
 
       await sendInteractive(phoneId, session.from, {
         type: 'button',
-        body: { text: `*${product.name}*\n${formatKES(product.price)}\n${product.description || ''}\n\nHow many?` },
+        body: { text: '*' + product.name + '*\n' + formatKES(product.price) + '\n' + (product.description || '') + '\n\nHow many?' },
         action: {
           buttons: [
-            { type: 'reply', reply: { id: `QTY_${productId}_1`, title: '1' } },
-            { type: 'reply', reply: { id: `QTY_${productId}_2`, title: '2' } },
-            { type: 'reply', reply: { id: `QTY_${productId}_3`, title: '3' } },
+            { type: 'reply', reply: { id: 'QTY_' + productId + '_1', title: '1' } },
+            { type: 'reply', reply: { id: 'QTY_' + productId + '_2', title: '2' } },
+            { type: 'reply', reply: { id: 'QTY_' + productId + '_3', title: '3' } },
           ]
         }
       });
@@ -183,45 +156,43 @@ if (items.length > maxRows) {
       return { ...session, step: 'CART_REVIEW' };
     }
 
-    /* ── 4. CART_REVIEW ─────────────────────────────────────── */
     case 'CART_REVIEW': {
       if (input.startsWith('QTY_')) {
-        const parts   = input.split('_');
-        const qty     = parseInt(parts[parts.length - 1], 10);
-        const pid     = parts.slice(1, -1).join('_');
-        const allProds= biz.products || getDefaultProducts(biz.sector);
-        const product = allProds.find(p => p.id === pid);
+        var qtyParts = input.split('_');
+        var qty      = parseInt(qtyParts[qtyParts.length - 1], 10);
+        var pid      = qtyParts.slice(1, -1).join('_');
+        var qtyProds = biz.products || getDefaultProducts(biz.sector);
+        var qtyProd  = qtyProds.find(function(p) { return p.id === pid; });
 
-        if (product && qty > 0) {
-          const cart     = [...(session.cart || [])];
-          const existing = cart.findIndex(i => i.productId === pid);
+        if (qtyProd && qty > 0) {
+          var cart     = (session.cart || []).slice();
+          var existing = -1;
+          for (var i = 0; i < cart.length; i++) { if (cart[i].productId === pid) { existing = i; break; } }
           if (existing >= 0) {
-            cart[existing] = { ...cart[existing], qty: cart[existing].qty + qty };
+            cart[existing] = { productId: cart[existing].productId, name: cart[existing].name, qty: cart[existing].qty + qty, unitPrice: cart[existing].unitPrice };
           } else {
-            cart.push({ productId: pid, name: product.name, qty, unitPrice: product.price });
+            cart.push({ productId: pid, name: qtyProd.name, qty: qty, unitPrice: qtyProd.price });
           }
-          session = { ...session, cart };
+          session = { ...session, cart: cart };
         }
       }
 
       if (!session.cart || session.cart.length === 0) {
-        await sendMessage(phoneId, session.from, 'Your cart is empty. Let\'s add something! 🛒');
+        await sendMessage(phoneId, session.from, 'Your cart is empty. Let\'s add something!');
         return handle(phoneId, { ...session, step: 'BROWSING' }, '', biz);
       }
 
-      const total    = session.cart.reduce((s, i) => s + i.qty * i.unitPrice, 0);
-      const cartText = session.cart.map(i =>
-        `• ${i.name} × ${i.qty} = ${formatKES(i.qty * i.unitPrice)}`
-      ).join('\n');
+      var cartTotal = session.cart.reduce(function(s, i) { return s + i.qty * i.unitPrice; }, 0);
+      var cartText  = session.cart.map(function(i) { return '- ' + i.name + ' x ' + i.qty + ' = ' + formatKES(i.qty * i.unitPrice); }).join('\n');
 
       await sendInteractive(phoneId, session.from, {
         type: 'button',
-        body: { text: `🛒 *Your Order*\n\n${cartText}\n\n*Total: ${formatKES(total)}*` },
+        body: { text: '*Your Order*\n\n' + cartText + '\n\n*Total: ' + formatKES(cartTotal) + '*' },
         action: {
           buttons: [
-            { type: 'reply', reply: { id: 'CHECKOUT',   title: '✅ Checkout'   } },
-            { type: 'reply', reply: { id: 'ADD_MORE',   title: '➕ Add More'   } },
-            { type: 'reply', reply: { id: 'CLEAR_CART', title: '🗑️ Clear Cart' } },
+            { type: 'reply', reply: { id: 'CHECKOUT',   title: 'Checkout'   } },
+            { type: 'reply', reply: { id: 'ADD_MORE',   title: 'Add More'   } },
+            { type: 'reply', reply: { id: 'CLEAR_CART', title: 'Clear Cart' } },
           ]
         }
       });
@@ -233,20 +204,19 @@ if (items.length > maxRows) {
       return { ...session, step: 'CART_REVIEW' };
     }
 
-    /* ── 5. DELIVERY_DETAILS ────────────────────────────────── */
     case 'DELIVERY_DETAILS': {
       if (session.location && !session._locationConfirmed) {
-        const loc  = session.location;
-        const addr = loc.name || loc.address || `${loc.latitude}, ${loc.longitude}`;
-        session    = { ...session, pendingAddr: addr, _locationConfirmed: true };
+        var loc  = session.location;
+        var addr = loc.name || loc.address || (loc.latitude + ', ' + loc.longitude);
+        session  = { ...session, pendingAddr: addr, _locationConfirmed: true };
 
         await sendInteractive(phoneId, session.from, {
           type: 'button',
-          body: { text: `📍 Deliver to:\n*${addr}*\n\nConfirm?` },
+          body: { text: 'Deliver to:\n*' + addr + '*\n\nConfirm?' },
           action: {
             buttons: [
-              { type: 'reply', reply: { id: 'ADDR_OK',     title: '✅ Yes, correct' } },
-              { type: 'reply', reply: { id: 'ADDR_RETYPE', title: '✏️ Type address' } },
+              { type: 'reply', reply: { id: 'ADDR_OK',     title: 'Yes, correct' } },
+              { type: 'reply', reply: { id: 'ADDR_RETYPE', title: 'Type address' } },
             ]
           }
         });
@@ -255,117 +225,109 @@ if (items.length > maxRows) {
 
       if (input === 'ADDR_OK')     return { ...session, step: 'PAYMENT_CHOICE' };
       if (input === 'ADDR_RETYPE') {
-        await sendMessage(phoneId, session.from,
-          '📝 Type your delivery address:\n(Building, street or nearest landmark)');
+        await sendMessage(phoneId, session.from, 'Type your delivery address:\n(Building, street or nearest landmark)');
         return { ...session, step: 'TYPING_ADDRESS', _locationConfirmed: false, location: null };
       }
 
-      await requestLocation(phoneId, session.from,
-        '📍 *Where should we deliver?*\n\nShare your location or type your address below.');
+      await requestLocation(phoneId, session.from, 'Where should we deliver?\n\nShare your location or type your address below.');
       return { ...session, step: 'DELIVERY_DETAILS' };
     }
 
-    /* ── 5b. TYPING_ADDRESS ─────────────────────────────────── */
     case 'TYPING_ADDRESS': {
       if (input === 'ADDR_OK')     return { ...session, step: 'PAYMENT_CHOICE' };
       if (input === 'ADDR_RETYPE') {
-        await sendMessage(phoneId, session.from, '📝 Type your delivery address:');
+        await sendMessage(phoneId, session.from, 'Type your delivery address:');
         return { ...session, step: 'TYPING_ADDRESS', _locationConfirmed: false };
       }
 
-      const addr = sanitise(input);
-      if (addr.length < 5) {
-        await sendMessage(phoneId, session.from, '⚠️ Please type a complete address (at least 5 characters).');
+      var typedAddr = sanitise(input);
+      if (typedAddr.length < 5) {
+        await sendMessage(phoneId, session.from, 'Please type a complete address.');
         return session;
       }
 
       await sendInteractive(phoneId, session.from, {
         type: 'button',
-        body: { text: `📍 Deliver to:\n*${addr}*\n\nConfirm?` },
+        body: { text: 'Deliver to:\n*' + typedAddr + '*\n\nConfirm?' },
         action: {
           buttons: [
-            { type: 'reply', reply: { id: 'ADDR_OK',     title: '✅ Yes, correct' } },
-            { type: 'reply', reply: { id: 'ADDR_RETYPE', title: '✏️ Change it'    } },
+            { type: 'reply', reply: { id: 'ADDR_OK',     title: 'Yes, correct' } },
+            { type: 'reply', reply: { id: 'ADDR_RETYPE', title: 'Change it'    } },
           ]
         }
       });
 
-      return { ...session, pendingAddr: addr, step: 'DELIVERY_DETAILS', _locationConfirmed: true };
+      return { ...session, pendingAddr: typedAddr, step: 'DELIVERY_DETAILS', _locationConfirmed: true };
     }
 
-    /* ── 6. PAYMENT_CHOICE ──────────────────────────────────── */
     case 'PAYMENT_CHOICE': {
-      const total   = session.cart.reduce((s, i) => s + i.qty * i.unitPrice, 0);
-      const tillNum = biz.mpesaTill || process.env.MPESA_TILL;
-      const hasSTK  = (biz.mpesaShortcode || process.env.MPESA_SHORTCODE) && process.env.MPESA_KEY;
+      var payTotal  = session.cart.reduce(function(s, i) { return s + i.qty * i.unitPrice; }, 0);
+      var tillNum   = biz.mpesaTill || process.env.MPESA_TILL;
+      var hasSTK    = (biz.mpesaShortcode || process.env.MPESA_SHORTCODE) && process.env.MPESA_KEY;
 
-      const buttons = [];
-      if (hasSTK) buttons.push({ type: 'reply', reply: { id: 'PAY_MPESA_STK',    title: '⚡ M-Pesa Push'    } });
-      buttons.push(  { type: 'reply', reply: { id: 'PAY_MPESA_MANUAL', title: '📲 M-Pesa Manual'  } });
-      buttons.push(  { type: 'reply', reply: { id: 'PAY_COD',          title: '💵 Pay on Delivery' } });
+      var payBtns = [];
+      if (hasSTK) payBtns.push({ type: 'reply', reply: { id: 'PAY_MPESA_STK',    title: 'M-Pesa Push'    } });
+      payBtns.push(            { type: 'reply', reply: { id: 'PAY_MPESA_MANUAL', title: 'M-Pesa Manual'  } });
+      payBtns.push(            { type: 'reply', reply: { id: 'PAY_COD',          title: 'Pay on Delivery'} });
 
-      if (!['PAY_MPESA_STK','PAY_MPESA_MANUAL','PAY_COD'].includes(input)) {
+      if (input !== 'PAY_MPESA_STK' && input !== 'PAY_MPESA_MANUAL' && input !== 'PAY_COD') {
         await sendInteractive(phoneId, session.from, {
           type: 'button',
-          body: { text: `💳 *Payment — ${formatKES(total)}*\n\n📍 ${session.pendingAddr || 'N/A'}\n\nChoose payment method:` },
-          action: { buttons: buttons.slice(0, 3) }
+          body: { text: '*Payment - ' + formatKES(payTotal) + '*\n\nAddress: ' + (session.pendingAddr || 'N/A') + '\n\nChoose payment:' },
+          action: { buttons: payBtns.slice(0, 3) }
         });
         return { ...session, step: 'PAYMENT_CHOICE' };
       }
 
-      const orderId = generateOrderId();
+      var orderId = generateOrderId();
 
       if (input === 'PAY_MPESA_MANUAL') {
         await sendMessage(phoneId, session.from,
-          `✅ *Order ${orderId} placed!*\n\n` +
-          `💳 Pay *${formatKES(total)}* via M-Pesa:\n` +
-          `📲 Till: *${tillNum}*\n` +
-          `Ref: *${orderId}*\n\n` +
-          `Send your M-Pesa code here after paying (e.g. *QGH3K7XZZZ*).\n\nReply *menu* to cancel.`
+          'Order ' + orderId + ' placed!\n\n' +
+          'Pay ' + formatKES(payTotal) + ' via M-Pesa:\n' +
+          'Till: *' + tillNum + '*\n' +
+          'Ref: *' + orderId + '*\n\n' +
+          'Send your M-Pesa code here after paying.\nReply menu to cancel.'
         );
-        await saveOrder({ orderId, session, total, status: 'PENDING_PAYMENT', biz });
-        return { ...session, step: 'AWAITING_PAYMENT', orderId };
+        await saveOrder({ orderId: orderId, session: session, total: payTotal, status: 'PENDING_PAYMENT', biz: biz });
+        return { ...session, step: 'AWAITING_PAYMENT', orderId: orderId };
       }
 
       if (input === 'PAY_MPESA_STK') {
-        await sendMessage(phoneId, session.from, `⚡ Sending M-Pesa prompt to your phone…`);
+        await sendMessage(phoneId, session.from, 'Sending M-Pesa prompt to your phone...');
         try {
-          await mpesa.stkPush({ phone: session.from, amount: total, orderId, biz });
-          await saveOrder({ orderId, session, total, status: 'PENDING_PAYMENT', biz });
-          await sendMessage(phoneId, session.from,
-            `📲 Enter your M-Pesa PIN on your phone.\nOrder ID: *${orderId}*`);
+          await mpesa.stkPush({ phone: session.from, amount: payTotal, orderId: orderId, biz: biz });
+          await saveOrder({ orderId: orderId, session: session, total: payTotal, status: 'PENDING_PAYMENT', biz: biz });
+          await sendMessage(phoneId, session.from, 'Enter your M-Pesa PIN on your phone.\nOrder ID: *' + orderId + '*');
         } catch (e) {
-          await sendMessage(phoneId, session.from,
-            `⚠️ Push failed. Pay manually:\n📲 Till: *${tillNum}*\nRef: *${orderId}*`);
-          await saveOrder({ orderId, session, total, status: 'PENDING_PAYMENT', biz });
+          await sendMessage(phoneId, session.from, 'Push failed. Pay manually:\nTill: *' + tillNum + '*\nRef: *' + orderId + '*');
+          await saveOrder({ orderId: orderId, session: session, total: payTotal, status: 'PENDING_PAYMENT', biz: biz });
         }
-        return { ...session, step: 'AWAITING_PAYMENT', orderId };
+        return { ...session, step: 'AWAITING_PAYMENT', orderId: orderId };
       }
 
       if (input === 'PAY_COD') {
         await sendMessage(phoneId, session.from,
-          `✅ *Order ${orderId} confirmed!* 🎉\n\n` +
-          `🚚 Delivering to: ${session.pendingAddr}\n` +
-          `💵 Pay *${formatKES(total)}* on delivery.\n\n` +
-          `We'll be with you shortly!\n` +
-          `Track: reply *menu* → *Track Order* → *${orderId}*`
+          'Order ' + orderId + ' confirmed!\n\n' +
+          'Delivering to: ' + session.pendingAddr + '\n' +
+          'Pay ' + formatKES(payTotal) + ' on delivery.\n\n' +
+          'We will be with you shortly!'
         );
-        await saveOrder({ orderId, session, total, status: 'CONFIRMED_COD', biz });
+        await saveOrder({ orderId: orderId, session: session, total: payTotal, status: 'CONFIRMED_COD', biz: biz });
         return { ...session, step: 'MAIN_MENU', cart: [], orderId: null };
       }
 
       return { ...session, step: 'PAYMENT_CHOICE' };
     }
 
-    /* ── 7. AWAITING_PAYMENT ────────────────────────────────── */
     case 'AWAITING_PAYMENT': {
-      const code = input.toUpperCase().replace(/\s/g, '');
+      var code = input.toUpperCase().replace(/\s/g, '');
       if (/^[A-Z0-9]{10}$/.test(code)) {
         await sendMessage(phoneId, session.from,
-          `✅ *Payment confirmed!*\n\n` +
-          `M-Pesa Code: *${code}*\n` +
-          `Order *${session.orderId}* is being prepared. 🍽️\n\n` +
-          `We'll notify you when it's on the way!`
+          'Payment confirmed!\n\n' +
+          'M-Pesa Code: *' + code + '*\n' +
+          'Order *' + session.orderId + '* is being prepared.\n\n' +
+          'We will notify you when it is on the way!'
         );
         await updateOrderStatus(session.orderId, 'PAID', { mpesaCode: code });
         return { ...session, step: 'MAIN_MENU', cart: [] };
@@ -373,7 +335,7 @@ if (items.length > maxRows) {
 
       if (input.length > 0) {
         await sendMessage(phoneId, session.from,
-          `⏳ Waiting for payment.\n\nSend your M-Pesa code (10 characters e.g. *QGH3K7XZZZ*).\nReply *menu* to cancel.`
+          'Waiting for payment.\n\nSend your M-Pesa code (10 characters e.g. QGH3K7XZZZ).\nReply menu to cancel.'
         );
       }
       return session;
@@ -384,14 +346,13 @@ if (items.length > maxRows) {
   }
 }
 
-/* ── Default flat catalogues ────────────────────────────────── */
 function getDefaultProducts(sector) {
-  const catalogues = {
+  var catalogues = {
     water: [
       { id: 'w5',  name: '5L Bottle',       price: 50,   description: 'Purified spring water' },
       { id: 'w10', name: '10L Jerry Can',    price: 80,   description: 'Refillable container'  },
       { id: 'w20', name: '20L Dispenser',    price: 150,  description: 'Home and office use'   },
-      { id: 'wmo', name: 'Monthly Plan 20L', price: 2500, description: '20 deliveries/month'   },
+      { id: 'wmo', name: 'Monthly Plan 20L', price: 2500, description: '20 deliveries per month'},
     ],
     gas: [
       { id: 'g6',  name: '6kg LPG',         price: 1500, description: 'Home cooking gas'      },
@@ -410,4 +371,4 @@ function getDefaultProducts(sector) {
   return catalogues[sector] || catalogues.water;
 }
 
-module.exports = { handle };
+module.exports = { handle: handle };
