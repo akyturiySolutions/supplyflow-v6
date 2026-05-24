@@ -2,4 +2,7 @@ node_modules/
 .env
 *.log
 .DS_Store
+firebase.json
+firebase_online.txt
+*.json.bak
 dist/
