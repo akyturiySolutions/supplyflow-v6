@@ -205,32 +205,13 @@ async function handle(phoneId, session, input, biz) {
     }
 
     case 'DELIVERY_DETAILS': {
-      if (session.location && !session._locationConfirmed) {
-        var loc  = session.location;
-        var addr = loc.name || loc.address || (loc.latitude + ', ' + loc.longitude);
-        session  = { ...session, pendingAddr: addr, _locationConfirmed: true };
-
-        await sendInteractive(phoneId, session.from, {
-          type: 'button',
-          body: { text: 'Deliver to:\n*' + addr + '*\n\nConfirm?' },
-          action: {
-            buttons: [
-              { type: 'reply', reply: { id: 'ADDR_OK',     title: 'Yes, correct' } },
-              { type: 'reply', reply: { id: 'ADDR_RETYPE', title: 'Type address' } },
-            ]
-          }
-        });
-        return session;
-      }
-
-      if (input === 'ADDR_OK')     return { ...session, step: 'PAYMENT_CHOICE' };
-      if (input === 'ADDR_RETYPE') {
-        await sendMessage(phoneId, session.from, 'Type your delivery address:\n(Building, street or nearest landmark)');
-        return { ...session, step: 'TYPING_ADDRESS', _locationConfirmed: false, location: null };
-      }
-
-      await requestLocation(phoneId, session.from, 'Where should we deliver?\n\nShare your location or type your address below.');
-      return { ...session, step: 'DELIVERY_DETAILS' };
+      // Skip location pin entirely — go straight to typed address
+      await sendMessage(phoneId, session.from,
+        'Where should we deliver your order?\n\n' +
+        'Please type your delivery address:\n' +
+        '(e.g. House No., Street, Estate or nearest landmark)'
+      );
+      return { ...session, step: 'TYPING_ADDRESS', _locationConfirmed: false, location: null };
     }
 
     case 'TYPING_ADDRESS': {
