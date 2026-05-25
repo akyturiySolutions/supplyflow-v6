@@ -157,6 +157,11 @@ async function handle(phoneId, session, input, biz) {
     }
 
     case 'CART_REVIEW': {
+      // Early exit for cart action buttons — don't re-render cart
+      if (input === 'CHECKOUT')   return { ...session, step: 'DELIVERY_DETAILS' };
+      if (input === 'ADD_MORE')   return handle(phoneId, { ...session, step: 'BROWSING' }, '', biz);
+      if (input === 'CLEAR_CART') return handle(phoneId, { ...session, cart: [], step: 'BROWSING' }, '', biz);
+
       if (input.startsWith('QTY_')) {
         var qtyParts = input.split('_');
         var qty      = parseInt(qtyParts[qtyParts.length - 1], 10);
@@ -190,16 +195,12 @@ async function handle(phoneId, session, input, biz) {
         body: { text: '*Your Order*\n\n' + cartText + '\n\n*Total: ' + formatKES(cartTotal) + '*' },
         action: {
           buttons: [
-            { type: 'reply', reply: { id: 'CHECKOUT',   title: 'Checkout'   } },
+            { type: 'reply', reply: { id: 'CHECKOUT',   title: 'Go to Payment' } },
             { type: 'reply', reply: { id: 'ADD_MORE',   title: 'Add More'   } },
             { type: 'reply', reply: { id: 'CLEAR_CART', title: 'Clear Cart' } },
           ]
         }
       });
-
-      if (input === 'CHECKOUT')   return { ...session, step: 'DELIVERY_DETAILS' };
-      if (input === 'ADD_MORE')   return handle(phoneId, { ...session, step: 'BROWSING' }, '', biz);
-      if (input === 'CLEAR_CART') return handle(phoneId, { ...session, cart: [], step: 'BROWSING' }, '', biz);
 
       return { ...session, step: 'CART_REVIEW' };
     }
@@ -222,8 +223,8 @@ async function handle(phoneId, session, input, biz) {
       }
 
       var typedAddr = sanitise(input);
-      if (typedAddr.length < 5) {
-        await sendMessage(phoneId, session.from, 'Please type a complete address.');
+      if (typedAddr.length < 2) {
+        await sendMessage(phoneId, session.from, 'Please type your delivery location.');
         return session;
       }
 
