@@ -157,10 +157,10 @@ async function handle(phoneId, session, input, biz) {
     }
 
     case 'CART_REVIEW': {
-      // Early exit for cart action buttons — don't re-render cart
-      if (input === 'CHECKOUT')   return { ...session, step: 'DELIVERY_DETAILS' };
-      if (input === 'ADD_MORE')   return handle(phoneId, { ...session, step: 'BROWSING' }, '', biz);
-      if (input === 'CLEAR_CART') return handle(phoneId, { ...session, cart: [], step: 'BROWSING' }, '', biz);
+      // Route button presses immediately — never re-render cart for these
+      if (input === 'CHECKOUT')   { console.log('[OrderFlow] CHECKOUT tapped -> DELIVERY_DETAILS'); return { ...session, step: 'DELIVERY_DETAILS' }; }
+      if (input === 'ADD_MORE')   { console.log('[OrderFlow] ADD_MORE tapped -> BROWSING'); return handle(phoneId, { ...session, step: 'BROWSING' }, '', biz); }
+      if (input === 'CLEAR_CART') { console.log('[OrderFlow] CLEAR_CART tapped -> BROWSING'); return handle(phoneId, { ...session, cart: [], step: 'BROWSING' }, '', biz); }
 
       if (input.startsWith('QTY_')) {
         var qtyParts = input.split('_');
@@ -216,30 +216,22 @@ async function handle(phoneId, session, input, biz) {
     }
 
     case 'TYPING_ADDRESS': {
-      if (input === 'ADDR_OK')     return { ...session, step: 'PAYMENT_CHOICE' };
-      if (input === 'ADDR_RETYPE') {
-        await sendMessage(phoneId, session.from, 'Type your delivery address:');
-        return { ...session, step: 'TYPING_ADDRESS', _locationConfirmed: false };
-      }
-
       var typedAddr = sanitise(input);
-      if (typedAddr.length < 2) {
-        await sendMessage(phoneId, session.from, 'Please type your delivery location.');
+
+      // Ignore button IDs that may arrive here accidentally
+      if (input === 'CHECKOUT' || input === 'ADD_MORE' || input === 'CLEAR_CART') {
+        await sendMessage(phoneId, session.from, 'Please type your delivery address:\n(e.g. Kerugoya stage, ABC building, Land offices)');
         return session;
       }
 
-      await sendInteractive(phoneId, session.from, {
-        type: 'button',
-        body: { text: 'Deliver to:\n*' + typedAddr + '*\n\nConfirm?' },
-        action: {
-          buttons: [
-            { type: 'reply', reply: { id: 'ADDR_OK',     title: 'Yes, correct' } },
-            { type: 'reply', reply: { id: 'ADDR_RETYPE', title: 'Change it'    } },
-          ]
-        }
-      });
+      if (typedAddr.length < 2) {
+        await sendMessage(phoneId, session.from, 'Please type your delivery location.\n(e.g. Kerugoya stage, ABC building, Land offices)');
+        return session;
+      }
 
-      return { ...session, pendingAddr: typedAddr, step: 'TYPING_ADDRESS', _locationConfirmed: true };
+      // Address received — go DIRECTLY to payment, no confirmation needed
+      console.log('[OrderFlow] Address typed:', typedAddr, '-> PAYMENT_CHOICE');
+      return { ...session, pendingAddr: typedAddr, step: 'PAYMENT_CHOICE' };
     }
 
     case 'PAYMENT_CHOICE': {
@@ -247,16 +239,17 @@ async function handle(phoneId, session, input, biz) {
       var tillNum   = biz.mpesaTill || process.env.MPESA_TILL;
       var hasSTK    = (biz.mpesaShortcode || process.env.MPESA_SHORTCODE) && process.env.MPESA_KEY;
 
-      var payBtns = [];
-      if (hasSTK) payBtns.push({ type: 'reply', reply: { id: 'PAY_MPESA_STK',    title: 'M-Pesa Push'    } });
-      payBtns.push(            { type: 'reply', reply: { id: 'PAY_MPESA_MANUAL', title: 'M-Pesa Manual'  } });
-      payBtns.push(            { type: 'reply', reply: { id: 'PAY_COD',          title: 'Pay on Delivery'} });
-
-      if (input !== 'PAY_MPESA_STK' && input !== 'PAY_MPESA_MANUAL' && input !== 'PAY_COD') {
+      // Two payment options only: Manual M-Pesa + Pay on Delivery
+      if (input !== 'PAY_MPESA_MANUAL' && input !== 'PAY_COD') {
         await sendInteractive(phoneId, session.from, {
           type: 'button',
-          body: { text: '*Payment - ' + formatKES(payTotal) + '*\n\nAddress: ' + (session.pendingAddr || 'N/A') + '\n\nChoose payment:' },
-          action: { buttons: payBtns.slice(0, 3) }
+          body: { text: '*How would you like to pay?*\n\nOrder Total: *' + formatKES(payTotal) + '*\nDeliver to: ' + (session.pendingAddr || 'N/A') },
+          action: {
+            buttons: [
+              { type: 'reply', reply: { id: 'PAY_MPESA_MANUAL', title: 'Pay via M-Pesa'   } },
+              { type: 'reply', reply: { id: 'PAY_COD',          title: 'Pay on Delivery'  } },
+            ]
+          }
         });
         return { ...session, step: 'PAYMENT_CHOICE' };
       }
@@ -265,26 +258,14 @@ async function handle(phoneId, session, input, biz) {
 
       if (input === 'PAY_MPESA_MANUAL') {
         await sendMessage(phoneId, session.from,
-          'Order ' + orderId + ' placed!\n\n' +
-          'Pay ' + formatKES(payTotal) + ' via M-Pesa:\n' +
-          'Till: *' + tillNum + '*\n' +
-          'Ref: *' + orderId + '*\n\n' +
-          'Send your M-Pesa code here after paying.\nReply menu to cancel.'
+          'Order *' + orderId + '* placed! ✅\n\n' +
+          'Please pay *' + formatKES(payTotal) + '* via M-Pesa:\n' +
+          'Till Number: *' + (tillNum || '5214133') + '*\n' +
+          'Account Ref: *' + orderId + '*\n\n' +
+          'After paying, send your M-Pesa confirmation code here.\n' +
+          '(e.g. QGH3K7XZZZ)\n\nReply *menu* to cancel.'
         );
         await saveOrder({ orderId: orderId, session: session, total: payTotal, status: 'PENDING_PAYMENT', biz: biz });
-        return { ...session, step: 'AWAITING_PAYMENT', orderId: orderId };
-      }
-
-      if (input === 'PAY_MPESA_STK') {
-        await sendMessage(phoneId, session.from, 'Sending M-Pesa prompt to your phone...');
-        try {
-          await mpesa.stkPush({ phone: session.from, amount: payTotal, orderId: orderId, biz: biz });
-          await saveOrder({ orderId: orderId, session: session, total: payTotal, status: 'PENDING_PAYMENT', biz: biz });
-          await sendMessage(phoneId, session.from, 'Enter your M-Pesa PIN on your phone.\nOrder ID: *' + orderId + '*');
-        } catch (e) {
-          await sendMessage(phoneId, session.from, 'Push failed. Pay manually:\nTill: *' + tillNum + '*\nRef: *' + orderId + '*');
-          await saveOrder({ orderId: orderId, session: session, total: payTotal, status: 'PENDING_PAYMENT', biz: biz });
-        }
         return { ...session, step: 'AWAITING_PAYMENT', orderId: orderId };
       }
 
