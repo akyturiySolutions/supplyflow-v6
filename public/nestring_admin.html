@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nestring Foods — Order Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0d0a;--sidebar:#0f1a10;--card:#111f12;--card2:#152016;
+  --border:#1e3320;--accent:#4caf50;--accent2:#8bc34a;--accent3:#f59e0b;
+  --text:#e8f5e9;--muted:#6a8f6d;--danger:#f43f5e;--gold:#c8963e;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh}
+
+/* ── Sidebar ── */
+.sidebar{width:230px;min-height:100vh;background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;z-index:100}
+.logo{padding:24px 20px;border-bottom:1px solid var(--border);text-align:center}
+.logo-icon{font-size:36px;margin-bottom:6px}
+.logo h1{font-family:'Playfair Display',serif;font-size:18px;font-weight:900;color:var(--text);line-height:1.2}
+.logo h1 span{color:var(--accent)}
+.logo p{color:var(--muted);font-size:11px;margin-top:4px;letter-spacing:.05em}
+.logo-badge{display:inline-block;background:rgba(76,175,80,.15);color:var(--accent);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-top:6px}
+nav{flex:1;padding:16px 12px}
+.nav-section{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;padding:12px 12px 6px}
+.nav-link{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;color:var(--muted);font-size:14px;font-weight:500;cursor:pointer;transition:.15s;margin-bottom:2px}
+.nav-link:hover,.nav-link.active{background:rgba(76,175,80,.1);color:var(--text)}
+.nav-link.active{color:var(--accent)}
+.nav-link .icon{font-size:16px;flex-shrink:0}
+.sidebar-foot{padding:16px;border-top:1px solid var(--border)}
+.sidebar-foot .owner-info{font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6}
+.sidebar-foot .owner-info strong{color:var(--text);display:block}
+.sidebar-foot button{width:100%;padding:8px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;cursor:pointer;font-size:12px;transition:.15s}
+.sidebar-foot button:hover{border-color:var(--danger);color:var(--danger)}
+
+/* ── Main ── */
+.main{margin-left:230px;flex:1;padding:28px 32px;min-height:100vh}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid var(--border)}
+.topbar-left h2{font-family:'Playfair Display',serif;font-size:24px;font-weight:700}
+.topbar-left p{color:var(--muted);font-size:13px;margin-top:2px}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.status-pill{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--accent);background:rgba(76,175,80,.1);border:1px solid rgba(76,175,80,.2);padding:6px 12px;border-radius:20px}
+.status-dot{width:7px;height:7px;background:var(--accent);border-radius:50%;box-shadow:0 0 6px var(--accent);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.refresh-btn{padding:8px 16px;background:var(--accent);color:#000;font-weight:700;font-size:12px;border:none;border-radius:8px;cursor:pointer;transition:.15s}
+.refresh-btn:hover{opacity:.85}
+
+/* ── Stats ── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;margin-bottom:28px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+.stat-icon{font-size:22px;margin-bottom:8px}
+.stat-label{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.stat-val{font-family:'Playfair Display',serif;font-size:30px;font-weight:700;color:var(--text)}
+.stat-sub{font-size:12px;color:var(--accent);margin-top:4px}
+
+/* ── Sections ── */
+.section{display:none}.section.active{display:block}
+
+/* ── Table ── */
+.table-wrap{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:20px}
+.table-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+.table-head h3{font-size:15px;font-weight:600;font-family:'Playfair Display',serif}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--card2)}
+.tbl td{padding:13px 20px;font-size:13px;border-bottom:1px solid rgba(30,51,32,.5)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:rgba(76,175,80,.03)}
+.badge{display:inline-block;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:.03em}
+.badge.PENDING_PAYMENT{background:rgba(245,158,11,.15);color:var(--accent3)}
+.badge.PAID,.badge.CONFIRMED_COD{background:rgba(76,175,80,.15);color:var(--accent)}
+.badge.DISPATCHED,.badge.PROCESSING{background:rgba(139,195,74,.15);color:var(--accent2)}
+.badge.DELIVERED{background:rgba(76,175,80,.25);color:#69f070}
+.badge.CANCELLED{background:rgba(244,63,94,.15);color:var(--danger)}
+.btn-sm{padding:5px 12px;font-size:12px;font-weight:600;border:none;border-radius:7px;cursor:pointer;transition:.15s}
+.btn-green{background:var(--accent);color:#000}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-sm:hover{opacity:.85}
+
+/* ── Chart ── */
+.chart-wrap{padding:20px;border-top:1px solid var(--border)}
+.chart-bars{display:flex;align-items:flex-end;gap:8px;height:130px}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.bar{width:100%;background:linear-gradient(180deg,var(--accent),var(--accent2));border-radius:4px 4px 0 0;min-height:4px;transition:.5s}
+.bar-label{font-size:9px;color:var(--muted)}
+.bar-val{font-size:9px;color:var(--accent)}
+
+/* ── Config ── */
+.config-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:900px){.config-grid{grid-template-columns:1fr}}
+.config-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px}
+.config-card h3{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--accent);margin-bottom:16px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.field input,.field select,.field textarea{width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:.2s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(76,175,80,.1)}
+.field textarea{min-height:80px;resize:vertical}
+.save-btn{padding:10px 24px;background:var(--accent);color:#000;font-weight:700;border:none;border-radius:8px;cursor:pointer;font-size:13px;transition:.15s}
+.save-btn:hover{opacity:.85}
+
+/* ── Modal ── */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(10,13,10,.9);z-index:200;align-items:center;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;width:90%;max-width:480px}
+.modal h3{font-family:'Playfair Display',serif;font-size:18px;margin-bottom:16px;color:var(--accent)}
+.modal-actions{display:flex;gap:10px;margin-top:20px;justify-content:flex-end}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--accent);color:var(--accent);padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;transform:translateY(100px);transition:.3s;z-index:300}
+.toast.show{transform:translateY(0)}
+
+/* ── Access level badge ── */
+.access-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px}
+.access-operator{background:rgba(200,150,62,.2);color:var(--gold)}
+.access-owner{background:rgba(76,175,80,.15);color:var(--accent)}
+
+.empty{text-align:center;padding:40px;color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-icon">🍽️</div>
+    <h1>Nestring <span>Foods</span></h1>
+    <p>FRESH MEALS · GREAT TASTE</p>
+    <span class="logo-badge" id="access-badge">Loading...</span>
+  </div>
+  <nav>
+    <div class="nav-section">Management</div>
+    <div class="nav-link active" onclick="nav('dashboard')"><span class="icon">📊</span> Dashboard</div>
+    <div class="nav-link" onclick="nav('orders')"><span class="icon">📦</span> Orders</div>
+    <div class="nav-link" onclick="nav('clients')"><span class="icon">👥</span> Customers</div>
+    <div class="nav-section">Insights</div>
+    <div class="nav-link" onclick="nav('analytics')"><span class="icon">📈</span> Analytics</div>
+    <div class="nav-section">Settings</div>
+    <div class="nav-link" onclick="nav('config')"><span class="icon">⚙️</span> Configuration</div>
+  </nav>
+  <div class="sidebar-foot">
+    <div class="owner-info">
+      <strong id="user-label">Nestring Foods</strong>
+      <span id="biz-id-display"></span>
+    </div>
+    <button onclick="logout()">Sign Out</button>
+  </div>
+</aside>
+
+<!-- Main -->
+<main class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <h2 id="page-title">Dashboard</h2>
+      <p id="page-sub">Today's overview for Nestring Foods</p>
+    </div>
+    <div class="topbar-right">
+      <div class="status-pill"><div class="status-dot"></div> Bot Active</div>
+      <button class="refresh-btn" onclick="refreshAll()">↻ Refresh</button>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="section active" id="sec-dashboard">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-icon">📦</div><div class="stat-label">Orders Today</div><div class="stat-val" id="st-orders">—</div></div>
+      <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-label">Revenue Today</div><div class="stat-val" id="st-rev">—</div></div>
+      <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">Total Customers</div><div class="stat-val" id="st-clients">—</div></div>
+      <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-label">30-Day Revenue</div><div class="stat-val" id="st-mrr">—</div></div>
+    </div>
+    <div class="table-wrap">
+      <div class="table-head">
+        <h3>Recent Orders</h3>
+        <span style="font-size:12px;color:var(--muted)" id="last-refresh"></span>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>Order ID</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Time</th><th>Action</th></tr></thead>
+        <tbody id="recent-orders"><tr><td colspan="7" class="empty">Loading orders...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Orders -->
+  <div class="section" id="sec-orders">
+    <div class="table-wrap">
+      <div class="table-head">
+        <h3>All Orders</h3>
+        <select id="order-filter" onchange="renderOrders()" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:7px;font-size:12px">
+          <option value="">All Statuses</option>
+          <option value="PENDING_PAYMENT">Pending Payment</option>
+          <option value="PAID">Paid</option>
+          <option value="CONFIRMED_COD">Pay on Delivery</option>
+          <option value="PROCESSING">Processing</option>
+          <option value="DISPATCHED">Dispatched</option>
+          <option value="DELIVERED">Delivered</option>
+          <option value="CANCELLED">Cancelled</option>
+        </select>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>Order ID</th><th>Customer</th><th>Delivery Address</th><th>Items</th><th>Total</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+        <tbody id="all-orders"><tr><td colspan="8" class="empty">Loading orders...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Customers -->
+  <div class="section" id="sec-clients">
+    <div class="stats-grid" style="margin-bottom:20px">
+      <div class="stat-card"><div class="stat-icon">🆕</div><div class="stat-label">Total Customers</div><div class="stat-val" id="cl-total">—</div></div>
+      <div class="stat-card"><div class="stat-icon">🔁</div><div class="stat-label">Repeat Customers</div><div class="stat-val" id="cl-repeat">—</div></div>
+    </div>
+    <div class="table-wrap">
+      <div class="table-head"><h3>Customer List</h3></div>
+      <table class="tbl">
+        <thead><tr><th>Name</th><th>Phone</th><th>Total Orders</th><th>Last Order</th><th>Action</th></tr></thead>
+        <tbody id="clients-body"><tr><td colspan="5" class="empty">Loading customers...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Analytics -->
+  <div class="section" id="sec-analytics">
+    <div class="table-wrap" style="margin-bottom:20px">
+      <div class="table-head"><h3>Revenue — Last 14 Days</h3></div>
+      <div class="chart-wrap">
+        <div class="chart-bars" id="rev-chart"><div class="empty" style="width:100%">Loading chart...</div></div>
+      </div>
+    </div>
+    <div class="stats-grid" id="analytics-summary"></div>
+  </div>
+
+  <!-- Config -->
+  <div class="section" id="sec-config">
+    <div id="config-owner-only" style="display:none">
+      <div class="config-grid">
+        <div class="config-card">
+          <h3>🍽️ Restaurant Settings</h3>
+          <div class="field"><label>Business Name</label><input id="cfg-name" placeholder="Nestring Foods"></div>
+          <div class="field"><label>WhatsApp Greeting</label><textarea id="cfg-greeting" placeholder="Welcome to Nestring Foods..."></textarea></div>
+          <div class="field"><label>Support Phone (with country code)</label><input id="cfg-support" placeholder="254712345678"></div>
+          <button class="save-btn" onclick="saveConfig()">Save Settings</button>
+        </div>
+        <div class="config-card">
+          <h3>💳 M-Pesa Settings</h3>
+          <div class="field"><label>Till / Buy Goods Number</label><input id="cfg-till" placeholder="5214133"></div>
+          <div class="field"><label>Business Shortcode (STK Push)</label><input id="cfg-shortcode" placeholder="174379"></div>
+          <p style="font-size:12px;color:var(--muted);margin-top:8px">STK Push sends automatic payment prompts to customers.</p>
+          <button class="save-btn" onclick="saveConfig()" style="margin-top:16px">Save M-Pesa</button>
+        </div>
+      </div>
+    </div>
+    <div id="config-readonly" style="display:none">
+      <div class="config-card">
+        <h3>⚙️ Your Bot Configuration</h3>
+        <p style="color:var(--muted);font-size:14px;line-height:1.8">
+          Your bot is configured and running.<br>
+          To update products, pricing or settings contact your system administrator.<br><br>
+          <strong style="color:var(--text)">WhatsApp Number:</strong> <span id="cfg-wa-number">—</span><br>
+          <strong style="color:var(--text)">M-Pesa Till:</strong> <span id="cfg-till-display">—</span><br>
+          <strong style="color:var(--text)">Sector:</strong> Food Delivery<br>
+          <strong style="color:var(--text)">Menu Mode:</strong> Categorised (4 categories)
+        </p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Order Update Modal -->
+<div class="modal-bg" id="order-modal">
+  <div class="modal">
+    <h3>Update Order <span id="modal-order-id" style="color:var(--muted);font-size:14px"></span></h3>
+    <div class="field"><label>New Status</label>
+      <select id="modal-status">
+        <option value="PAID">✅ Paid</option>
+        <option value="PROCESSING">🔄 Processing</option>
+        <option value="DISPATCHED">🚚 Dispatched</option>
+        <option value="DELIVERED">🎉 Delivered</option>
+        <option value="CANCELLED">❌ Cancelled</option>
+      </select>
+    </div>
+    <div class="field"><label>Rider Phone (optional)</label><input id="modal-driver" placeholder="254712345678"></div>
+    <div class="field"><label>Internal Note</label><input id="modal-note" placeholder="e.g. Paid via till, dispatched at 1pm"></div>
+    <div class="modal-actions">
+      <button class="btn-sm btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn-sm btn-green" onclick="updateOrder()">Update Order</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Auth & Access Level ──────────────────────────────────────
+const TOKEN   = localStorage.getItem('sf_token') || '';
+if (!TOKEN) window.location.href = '/login.html';
+
+// NESTRING_BIZ_ID is the Phone Number ID for Nestring Foods
+// This dashboard is LOCKED to Nestring data
+const NESTRING_BIZ_ID = '1139244165936738';
+
+// Access levels:
+// 'operator' = you (full access including config editing)
+// 'owner'    = Nestring Foods owner (read-only config, full orders/clients/analytics)
+// URL param: ?access=owner shows owner view
+const ACCESS = new URLSearchParams(window.location.search).get('access') || 'operator';
+const BIZ_Q  = '?bizId=' + NESTRING_BIZ_ID;
+
+// ── State ───────────────────────────────────────────────────
+let allOrders  = [];
+let allClients = [];
+let statsData  = {};
+let configData = {};
+let _editOrderId = '';
+
+// ── Init access level UI ─────────────────────────────────────
+function initAccessLevel() {
+  const badge = document.getElementById('access-badge');
+  const label = document.getElementById('user-label');
+  const bizDisplay = document.getElementById('biz-id-display');
+
+  if (ACCESS === 'operator') {
+    badge.textContent = '⚡ Operator View';
+    badge.style.background = 'rgba(200,150,62,.2)';
+    badge.style.color = '#c8963e';
+    label.textContent = 'System Operator';
+    bizDisplay.textContent = 'Full access';
+    bizDisplay.style.color = 'var(--muted)';
+    bizDisplay.style.fontSize = '11px';
+    document.getElementById('config-owner-only').style.display = 'block';
+  } else {
+    badge.textContent = '🍽️ Owner View';
+    badge.style.background = 'rgba(76,175,80,.15)';
+    badge.style.color = 'var(--accent)';
+    label.textContent = 'Nestring Foods';
+    bizDisplay.textContent = 'Owner access';
+    bizDisplay.style.color = 'var(--muted)';
+    bizDisplay.style.fontSize = '11px';
+    document.getElementById('config-readonly').style.display = 'block';
+  }
+}
+
+// ── API helper ───────────────────────────────────────────────
+async function api(path, opts) {
+  opts = opts || {};
+  var r = await fetch(path, {
+    headers: { Authorization: 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },
+    method: opts.method || 'GET',
+    body: opts.body || undefined
+  });
+  if (r.status === 401) { logout(); return null; }
+  return r.json();
+}
+
+// ── Helpers ──────────────────────────────────────────────────
+function fmtKES(n) { return 'KES ' + Number(n || 0).toLocaleString('en-KE'); }
+function fmtDate(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+function badge(s) {
+  return '<span class="badge ' + (s || '') + '">' + (s || '').replace(/_/g, ' ') + '</span>';
+}
+function toast(msg, ok) {
+  ok = ok !== false;
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.borderColor = ok ? 'var(--accent)' : 'var(--danger)';
+  t.style.color       = ok ? 'var(--accent)' : 'var(--danger)';
+  t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, 3000);
+}
+
+// ── Load all data ─────────────────────────────────────────────
+async function refreshAll() {
+  statsData  = await api('/api/admin/stats'   + BIZ_Q) || {};
+  allOrders  = await api('/api/admin/orders'  + BIZ_Q) || [];
+  allClients = await api('/api/admin/clients' + BIZ_Q) || [];
+  configData = await api('/api/admin/config'  + BIZ_Q) || {};
+
+  renderStats();
+  renderRecentOrders();
+  renderOrders();
+  renderClients();
+  renderAnalytics();
+  renderConfig();
+
+  document.getElementById('last-refresh').textContent =
+    'Last updated: ' + new Date().toLocaleTimeString('en-KE');
+}
+
+// ── Stats ─────────────────────────────────────────────────────
+function renderStats() {
+  document.getElementById('st-orders').textContent  = statsData.ordersToday  || 0;
+  document.getElementById('st-rev').textContent     = fmtKES(statsData.revenueToday);
+  document.getElementById('st-clients').textContent = statsData.totalClients  || 0;
+  document.getElementById('st-mrr').textContent     = fmtKES(statsData.mrr);
+}
+
+// ── Recent orders ─────────────────────────────────────────────
+function renderRecentOrders() {
+  var tbody = document.getElementById('recent-orders');
+  var rows  = allOrders.slice(0, 10);
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">No orders yet today</td></tr>'; return; }
+  tbody.innerHTML = rows.map(function(o) {
+    var items = (o.cart || []).map(function(i) { return i.name + ' x' + i.qty; }).join(', ').slice(0, 40);
+    return '<tr>' +
+      '<td><code style="color:var(--accent);font-size:12px">' + (o.orderId || o.id) + '</code></td>' +
+      '<td>' + (o.customerName || '—') + '</td>' +
+      '<td style="color:var(--muted);font-size:12px">' + items + '</td>' +
+      '<td style="font-weight:600">' + fmtKES(o.total) + '</td>' +
+      '<td>' + badge(o.status) + '</td>' +
+      '<td style="color:var(--muted);font-size:12px">' + fmtDate(o.createdAt) + '</td>' +
+      '<td><button class="btn-sm btn-outline" onclick="openModal(\'' + (o.orderId || o.id) + '\',\'' + o.status + '\')">Update</button></td>' +
+      '</tr>';
+  }).join('');
+}
+
+// ── All orders ────────────────────────────────────────────────
+function renderOrders() {
+  var filter = document.getElementById('order-filter').value;
+  var tbody  = document.getElementById('all-orders');
+  var rows   = allOrders.slice();
+  if (filter) rows = rows.filter(function(o) { return o.status === filter; });
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty">No orders found</td></tr>'; return; }
+  tbody.innerHTML = rows.map(function(o) {
+    var items = (o.cart || []).map(function(i) { return i.name + ' x' + i.qty; }).join(', ').slice(0, 50);
+    return '<tr>' +
+      '<td><code style="color:var(--accent);font-size:12px">' + (o.orderId || o.id) + '</code></td>' +
+      '<td>' + (o.customerName || '—') + '<br><span style="color:var(--muted);font-size:11px">' + (o.customerPhone || '') + '</span></td>' +
+      '<td style="color:var(--muted);font-size:12px;max-width:120px;overflow:hidden;text-overflow:ellipsis">' + (o.deliveryAddress || '—') + '</td>' +
+      '<td style="font-size:12px;color:var(--muted)">' + items + '</td>' +
+      '<td style="font-weight:600">' + fmtKES(o.total) + '</td>' +
+      '<td>' + badge(o.status) + '</td>' +
+      '<td style="color:var(--muted);font-size:12px">' + fmtDate(o.createdAt) + '</td>' +
+      '<td><button class="btn-sm btn-outline" onclick="openModal(\'' + (o.orderId || o.id) + '\',\'' + o.status + '\')">Update</button></td>' +
+      '</tr>';
+  }).join('');
+}
+
+// ── Customers ─────────────────────────────────────────────────
+function renderClients() {
+  var tbody   = document.getElementById('clients-body');
+  var repeat  = allClients.filter(function(c) { return (c.orderCount || 0) > 1; }).length;
+  document.getElementById('cl-total').textContent  = allClients.length;
+  document.getElementById('cl-repeat').textContent = repeat;
+
+  if (!allClients.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">No customers yet</td></tr>'; return; }
+  tbody.innerHTML = allClients.map(function(c) {
+    return '<tr>' +
+      '<td>' + (c.name || 'Unknown') + '</td>' +
+      '<td><code style="color:var(--accent2);font-size:12px">' + (c.phone || c.id) + '</code></td>' +
+      '<td style="font-weight:600;color:var(--accent)">' + (c.orderCount || 0) + '</td>' +
+      '<td style="color:var(--muted);font-size:12px">' + fmtDate(c.lastOrderAt) + '</td>' +
+      '<td><a href="https://wa.me/' + (c.phone || c.id).replace('+', '') + '" target="_blank" class="btn-sm btn-outline" style="text-decoration:none;display:inline-block">💬 Chat</a></td>' +
+      '</tr>';
+  }).join('');
+}
+
+// ── Analytics ─────────────────────────────────────────────────
+function renderAnalytics() {
+  var stats  = (statsData.recentStats || []).slice(0, 14).reverse();
+  var chart  = document.getElementById('rev-chart');
+  if (!stats.length) { chart.innerHTML = '<div class="empty" style="width:100%">No data yet — orders will appear here</div>'; }
+  else {
+    var maxRev = Math.max.apply(null, stats.map(function(s) { return s.revenue || 0; }).concat([1]));
+    chart.innerHTML = stats.map(function(s) {
+      var pct = Math.max(4, Math.round(((s.revenue || 0) / maxRev) * 100));
+      return '<div class="bar-col">' +
+        '<div class="bar-val">' + (s.revenue ? fmtKES(s.revenue).replace('KES ', '') : '0') + '</div>' +
+        '<div class="bar" style="height:' + pct + '%"></div>' +
+        '<div class="bar-label">' + (s.date || '').slice(5) + '</div>' +
+        '</div>';
+    }).join('');
+  }
+
+  var totalRev = (statsData.recentStats || []).slice(0,14).reduce(function(s,d){return s+(d.revenue||0);},0);
+  var totalOrd = (statsData.recentStats || []).slice(0,14).reduce(function(s,d){return s+(d.ordersCount||0);},0);
+  var avg      = totalOrd ? Math.round(totalRev / totalOrd) : 0;
+  document.getElementById('analytics-summary').innerHTML =
+    '<div class="stat-card"><div class="stat-icon">📅</div><div class="stat-label">14-Day Revenue</div><div class="stat-val">' + fmtKES(totalRev) + '</div></div>' +
+    '<div class="stat-card"><div class="stat-icon">📦</div><div class="stat-label">14-Day Orders</div><div class="stat-val">' + totalOrd + '</div></div>' +
+    '<div class="stat-card"><div class="stat-icon">💰</div><div class="stat-label">Avg Order Value</div><div class="stat-val">' + fmtKES(avg) + '</div></div>' +
+    '<div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">Total Customers</div><div class="stat-val">' + allClients.length + '</div></div>';
+}
+
+// ── Config ────────────────────────────────────────────────────
+function renderConfig() {
+  if (ACCESS === 'operator') {
+    document.getElementById('cfg-name').value      = configData.name         || 'Nestring Foods';
+    document.getElementById('cfg-greeting').value  = configData.greeting     || '';
+    document.getElementById('cfg-support').value   = configData.supportPhone || '';
+    document.getElementById('cfg-till').value      = configData.mpesaTill    || '';
+    document.getElementById('cfg-shortcode').value = configData.mpesaShortcode || '';
+  } else {
+    document.getElementById('cfg-wa-number').textContent  = '+' + NESTRING_BIZ_ID;
+    document.getElementById('cfg-till-display').textContent = configData.mpesaTill || '—';
+  }
+}
+
+async function saveConfig() {
+  if (ACCESS !== 'operator') { toast('Contact your administrator to update settings.', false); return; }
+  var body = {
+    name:           document.getElementById('cfg-name').value,
+    greeting:       document.getElementById('cfg-greeting').value,
+    supportPhone:   document.getElementById('cfg-support').value,
+    mpesaTill:      document.getElementById('cfg-till').value,
+    mpesaShortcode: document.getElementById('cfg-shortcode').value,
+  };
+  var r = await api('/api/admin/config' + BIZ_Q, { method: 'POST', body: JSON.stringify(body) });
+  if (r && r.ok) toast('Settings saved!');
+  else toast('Save failed — please try again', false);
+}
+
+// ── Modal ─────────────────────────────────────────────────────
+function openModal(orderId, status) {
+  _editOrderId = orderId;
+  document.getElementById('modal-order-id').textContent = orderId;
+  document.getElementById('modal-status').value = status || '';
+  document.getElementById('modal-driver').value = '';
+  document.getElementById('modal-note').value   = '';
+  document.getElementById('order-modal').classList.add('open');
+}
+function closeModal() { document.getElementById('order-modal').classList.remove('open'); }
+
+async function updateOrder() {
+  var body = {
+    status:      document.getElementById('modal-status').value,
+    driverPhone: document.getElementById('modal-driver').value,
+    note:        document.getElementById('modal-note').value,
+  };
+  var r = await api('/api/admin/orders/' + _editOrderId + '/status', { method: 'PATCH', body: JSON.stringify(body) });
+  if (r && r.ok) { toast('Order updated!'); closeModal(); refreshAll(); }
+  else toast('Update failed', false);
+}
+
+// ── Navigation ────────────────────────────────────────────────
+var sectionMap = { dashboard:'sec-dashboard', orders:'sec-orders', clients:'sec-clients', analytics:'sec-analytics', config:'sec-config' };
+var titleMap   = { dashboard:'Dashboard', orders:'Orders', clients:'Customers', analytics:'Analytics', config:'Configuration' };
+var subMap     = {
+  dashboard: 'Today\'s overview for Nestring Foods',
+  orders:    'All customer orders',
+  clients:   'Registered customers',
+  analytics: 'Revenue and order trends',
+  config:    'Bot and payment settings'
+};
+
+function nav(key) {
+  Object.values(sectionMap).forEach(function(id) { var el=document.getElementById(id); if(el) el.classList.remove('active'); });
+  document.querySelectorAll('.nav-link').forEach(function(l) { l.classList.remove('active'); });
+  var sec = document.getElementById(sectionMap[key]);
+  if (sec) sec.classList.add('active');
+  document.querySelectorAll('.nav-link').forEach(function(l) {
+    if (l.textContent.trim().toLowerCase().includes(key.slice(0,4).toLowerCase())) l.classList.add('active');
+  });
+  document.getElementById('page-title').textContent = titleMap[key] || key;
+  document.getElementById('page-sub').textContent   = subMap[key]   || '';
+}
+
+function logout() { localStorage.removeItem('sf_token'); window.location.href = '/login.html'; }
+
+// ── Start ─────────────────────────────────────────────────────
+initAccessLevel();
+refreshAll();
+setInterval(refreshAll, 30000);
+</script>
+</body>
+</html>
