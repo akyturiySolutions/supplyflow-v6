@@ -239,7 +239,7 @@ async function handle(phoneId, session, input, biz) {
         }
       });
 
-      return { ...session, pendingAddr: typedAddr, step: 'DELIVERY_DETAILS', _locationConfirmed: true };
+      return { ...session, pendingAddr: typedAddr, step: 'TYPING_ADDRESS', _locationConfirmed: true };
     }
 
     case 'PAYMENT_CHOICE': {
