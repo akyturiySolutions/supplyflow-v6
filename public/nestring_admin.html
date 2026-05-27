@@ -116,6 +116,26 @@ nav{flex:1;padding:16px 12px}
 .access-owner{background:rgba(76,175,80,.15);color:var(--accent)}
 
 .empty{text-align:center;padding:40px;color:var(--muted);font-size:14px}
+
+/* Calendar */
+.cal-day{border-radius:8px;padding:6px 4px;text-align:center;cursor:pointer;transition:.15s;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid transparent}
+.cal-day:hover{background:rgba(76,175,80,.1);border-color:var(--border)}
+.cal-day.today{border-color:var(--accent);background:rgba(76,175,80,.08)}
+.cal-day.selected{background:var(--accent);color:#000}
+.cal-day.selected .cal-day-num{color:#000}
+.cal-day.has-orders{border-color:rgba(76,175,80,.3)}
+.cal-day.empty{cursor:default;opacity:0}
+.cal-day-num{font-size:13px;font-weight:600;color:var(--text)}
+.cal-day-rev{font-size:9px;color:var(--accent);margin-top:2px;font-weight:600}
+.cal-day-cnt{font-size:9px;color:var(--muted)}
+.print-area{background:white;color:#000;padding:20px}
+@media print{
+  .sidebar,.topbar,.refresh-btn,.btn-sm{display:none!important}
+  .main{margin-left:0!important;padding:0!important}
+  .section{display:block!important}
+  body{background:white!important;color:#000!important}
+}
+
 </style>
 </head>
 <body>
@@ -135,6 +155,7 @@ nav{flex:1;padding:16px 12px}
     <div class="nav-link" onclick="nav('clients')"><span class="icon">👥</span> Customers</div>
     <div class="nav-section">Insights</div>
     <div class="nav-link" onclick="nav('analytics')"><span class="icon">📈</span> Analytics</div>
+    <div class="nav-link" onclick="nav('reports')"><span class="icon">📋</span> Daily Reports</div>
     <div class="nav-section">Settings</div>
     <div class="nav-link" onclick="nav('config')"><span class="icon">⚙️</span> Configuration</div>
   </nav>
@@ -227,6 +248,49 @@ nav{flex:1;padding:16px 12px}
       </div>
     </div>
     <div class="stats-grid" id="analytics-summary"></div>
+  </div>
+
+
+  <!-- Reports & Calendar -->
+  <div class="section" id="sec-reports">
+    <div class="stats-grid" style="margin-bottom:20px" id="report-stats"></div>
+
+    <!-- Calendar -->
+    <div class="table-wrap" style="margin-bottom:20px">
+      <div class="table-head">
+        <h3>📅 Order Calendar</h3>
+        <div style="display:flex;align-items:center;gap:10px">
+          <button class="btn-sm btn-outline" onclick="calPrev()">‹ Prev</button>
+          <span id="cal-month-label" style="font-weight:600;font-size:14px"></span>
+          <button class="btn-sm btn-outline" onclick="calNext()">Next ›</button>
+        </div>
+      </div>
+      <div style="padding:16px">
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:8px">
+          <div style="text-align:center;font-size:11px;color:var(--muted);font-weight:700;padding:4px">SUN</div>
+          <div style="text-align:center;font-size:11px;color:var(--muted);font-weight:700;padding:4px">MON</div>
+          <div style="text-align:center;font-size:11px;color:var(--muted);font-weight:700;padding:4px">TUE</div>
+          <div style="text-align:center;font-size:11px;color:var(--muted);font-weight:700;padding:4px">WED</div>
+          <div style="text-align:center;font-size:11px;color:var(--muted);font-weight:700;padding:4px">THU</div>
+          <div style="text-align:center;font-size:11px;color:var(--muted);font-weight:700;padding:4px">FRI</div>
+          <div style="text-align:center;font-size:11px;color:var(--muted);font-weight:700;padding:4px">SAT</div>
+        </div>
+        <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px"></div>
+      </div>
+    </div>
+
+    <!-- Selected day report -->
+    <div class="table-wrap" id="day-report-wrap" style="display:none">
+      <div class="table-head">
+        <h3 id="day-report-title">Orders for selected day</h3>
+        <button class="btn-sm btn-green" onclick="printReport()">🖨️ Print / Save PDF</button>
+      </div>
+      <div style="padding:20px" id="day-report-summary"></div>
+      <table class="tbl">
+        <thead><tr><th>Order ID</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Time</th></tr></thead>
+        <tbody id="day-report-orders"></tbody>
+      </table>
+    </div>
   </div>
 
   <!-- Config -->
@@ -533,13 +597,14 @@ async function updateOrder() {
 }
 
 // ── Navigation ────────────────────────────────────────────────
-var sectionMap = { dashboard:'sec-dashboard', orders:'sec-orders', clients:'sec-clients', analytics:'sec-analytics', config:'sec-config' };
-var titleMap   = { dashboard:'Dashboard', orders:'Orders', clients:'Customers', analytics:'Analytics', config:'Configuration' };
+var sectionMap = { dashboard:'sec-dashboard', orders:'sec-orders', clients:'sec-clients', analytics:'sec-analytics', reports:'sec-reports', config:'sec-config' };
+var titleMap   = { dashboard:'Dashboard', orders:'Orders', clients:'Customers', analytics:'Analytics', reports:'Daily Reports', config:'Configuration' };
 var subMap     = {
   dashboard: 'Today\'s overview for Nestring Foods',
   orders:    'All customer orders',
   clients:   'Registered customers',
   analytics: 'Revenue and order trends',
+  reports:   'Daily reports and order history by date',
   config:    'Bot and payment settings'
 };
 
@@ -564,3 +629,4 @@ setInterval(refreshAll, 30000);
 </script>
 </body>
 </html>
+<!-- THIS MARKER IS REPLACED BELOW -->
