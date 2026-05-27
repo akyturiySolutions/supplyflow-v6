@@ -224,7 +224,7 @@ async function handle(phoneId, session, input, biz) {
 
     case 'TYPING_ADDRESS': {
       // If it's a button ID (not a real address), re-ask
-      var isButtonId = (input === 'CHECKOUT' || input === 'ADD_MORE' || input === 'CLEAR_CART' ||
+      var isButtonId = (input === 'CHECKOUT' || input === 'CLEAR_CART' ||
                         input === 'PAY_MPESA_MANUAL' || input === 'PAY_COD' ||
                         input.startsWith('CAT_') || input.startsWith('ADD_') || input.startsWith('QTY_'));
 
