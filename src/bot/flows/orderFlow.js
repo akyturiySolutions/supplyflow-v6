@@ -158,7 +158,15 @@ async function handle(phoneId, session, input, biz) {
 
     case 'CART_REVIEW': {
       // Route button presses immediately — never re-render cart for these
-      if (input === 'CHECKOUT')   { console.log('[OrderFlow] CHECKOUT tapped -> DELIVERY_DETAILS'); return { ...session, step: 'DELIVERY_DETAILS' }; }
+      if (input === 'CHECKOUT') {
+        console.log('[OrderFlow] CHECKOUT -> asking for address directly');
+        await sendMessage(phoneId, session.from,
+          'Where should we deliver your order?\n\n' +
+          'Please type your delivery address:\n' +
+          '(e.g. Kerugoya stage, Land offices, ABC building)'
+        );
+        return { ...session, step: 'TYPING_ADDRESS' };
+      }
       if (input === 'ADD_MORE')   { console.log('[OrderFlow] ADD_MORE tapped -> BROWSING'); return handle(phoneId, { ...session, step: 'BROWSING' }, '', biz); }
       if (input === 'CLEAR_CART') { console.log('[OrderFlow] CLEAR_CART tapped -> BROWSING'); return handle(phoneId, { ...session, cart: [], step: 'BROWSING' }, '', biz); }
 
@@ -206,31 +214,39 @@ async function handle(phoneId, session, input, biz) {
     }
 
     case 'DELIVERY_DETAILS': {
-      // Skip location pin entirely — go straight to typed address
+      // Fallback — redirect to TYPING_ADDRESS immediately
       await sendMessage(phoneId, session.from,
-        'Where should we deliver your order?\n\n' +
         'Please type your delivery address:\n' +
-        '(e.g. House No., Street, Estate or nearest landmark)'
+        '(e.g. Kerugoya stage, Land offices, ABC building)'
       );
-      return { ...session, step: 'TYPING_ADDRESS', _locationConfirmed: false, location: null };
+      return { ...session, step: 'TYPING_ADDRESS' };
     }
 
     case 'TYPING_ADDRESS': {
+      // If it's a button ID (not a real address), re-ask
+      var isButtonId = (input === 'CHECKOUT' || input === 'ADD_MORE' || input === 'CLEAR_CART' ||
+                        input === 'PAY_MPESA_MANUAL' || input === 'PAY_COD' ||
+                        input.startsWith('CAT_') || input.startsWith('ADD_') || input.startsWith('QTY_'));
+
+      if (isButtonId) {
+        await sendMessage(phoneId, session.from,
+          'Please type your delivery address:\n' +
+          '(e.g. Kerugoya stage, Land offices, ABC building)'
+        );
+        return { ...session, step: 'TYPING_ADDRESS' };
+      }
+
       var typedAddr = sanitise(input);
 
-      // Ignore button IDs that may arrive here accidentally
-      if (input === 'CHECKOUT' || input === 'ADD_MORE' || input === 'CLEAR_CART') {
-        await sendMessage(phoneId, session.from, 'Please type your delivery address:\n(e.g. Kerugoya stage, ABC building, Land offices)');
-        return session;
-      }
-
       if (typedAddr.length < 2) {
-        await sendMessage(phoneId, session.from, 'Please type your delivery location.\n(e.g. Kerugoya stage, ABC building, Land offices)');
-        return session;
+        await sendMessage(phoneId, session.from,
+          'Please type your delivery location.\n(e.g. Kerugoya stage, ABC building)'
+        );
+        return { ...session, step: 'TYPING_ADDRESS' };
       }
 
-      // Address received — go DIRECTLY to payment, no confirmation needed
-      console.log('[OrderFlow] Address typed:', typedAddr, '-> PAYMENT_CHOICE');
+      // Valid address — go straight to payment
+      console.log('[OrderFlow] Address received:', typedAddr, '-> PAYMENT_CHOICE');
       return { ...session, pendingAddr: typedAddr, step: 'PAYMENT_CHOICE' };
     }
 
