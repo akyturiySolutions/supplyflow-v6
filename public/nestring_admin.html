@@ -370,14 +370,14 @@ function initUI() {
   var label = document.getElementById('user-label');
   var alab  = document.getElementById('access-label');
   if (ACCESS === 'operator') {
-    badge.textContent = '⚡ Operator';
+    badge.textContent = 'Operator';
     badge.style.background = 'rgba(245,158,11,.2)';
     badge.style.color = '#f59e0b';
     label.textContent = 'System Operator';
     alab.textContent  = 'Full access';
     document.getElementById('config-operator').style.display = 'block';
   } else {
-    badge.textContent = '🍽️ Owner View';
+    badge.textContent = 'Owner View';
     label.textContent = 'Nestring Foods';
     alab.textContent  = 'Owner access';
     document.getElementById('config-owner').style.display = 'block';
@@ -408,7 +408,7 @@ async function api(path, opts) {
 
 function showErr(msg) {
   var b = document.getElementById('err-banner');
-  b.textContent = '⚠️ ' + msg;
+  b.textContent = 'Warning: ' + msg;
   b.style.display = 'block';
   setTimeout(function(){ b.style.display = 'none'; }, 6000);
 }
@@ -441,7 +441,9 @@ async function refreshAll() {
 function kes(n) { return 'KES ' + Number(n||0).toLocaleString('en-KE'); }
 function fmtDate(ts) {
   if (!ts) return '--';
-  return new Date(ts).toLocaleDateString('en-KE',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+  var d = new Date(ts);
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return d.getDate() + ' ' + months[d.getMonth()] + ', ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2,'0');
 }
 function badge(s) {
   return '<span class="badge '+(s||'')+'">'+(s||'').replace(/_/g,' ')+'</span>';
