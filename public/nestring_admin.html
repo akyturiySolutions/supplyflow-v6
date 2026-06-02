@@ -446,7 +446,7 @@ function fmtDate(ts) {
   return d.getDate() + ' ' + months[d.getMonth()] + ', ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2,'0');
 }
 function badge(s) {
-  return '<span class="badge '+(s||'')+'">'+(s||'').replace(/_/g,' ')+'</span>';
+  return '<span class="badge ' + (s||'') + '">' + (s||'').replace(/_/g,' ') + '</span>';
 }
 function toast(msg, ok) {
   var t = document.getElementById('toast');
