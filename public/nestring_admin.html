@@ -345,16 +345,16 @@ nav{flex:1;padding:16px 12px}
 <div class="toast" id="toast"></div>
 
 <script>
-// ── Constants ─────────────────────────────────────────────────
+// -- Constants -------------------------------------------------
 var NESTRING_ID = '1139244165936738';
 var BIZ_Q       = '?bizId=' + NESTRING_ID;
 var ACCESS      = new URLSearchParams(window.location.search).get('access') || 'operator';
 var TOKEN       = localStorage.getItem('sf_token') || '';
 
-// If no token — redirect to login
+// If no token -- redirect to login
 if (!TOKEN) { window.location.href = '/login.html'; }
 
-// ── State ─────────────────────────────────────────────────────
+// -- State -----------------------------------------------------
 var allOrders  = [];
 var allClients = [];
 var statsData  = {};
@@ -364,7 +364,7 @@ var calMonth   = new Date().getMonth();
 var _editOid   = '';
 var MONTHS     = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-// ── Init UI ───────────────────────────────────────────────────
+// -- Init UI ---------------------------------------------------
 function initUI() {
   var badge = document.getElementById('access-badge');
   var label = document.getElementById('user-label');
@@ -384,7 +384,7 @@ function initUI() {
   }
 }
 
-// ── API ───────────────────────────────────────────────────────
+// -- API -------------------------------------------------------
 async function api(path, opts) {
   try {
     opts = opts || {};
@@ -413,7 +413,7 @@ function showErr(msg) {
   setTimeout(function(){ b.style.display = 'none'; }, 6000);
 }
 
-// ── Load data ─────────────────────────────────────────────────
+// -- Load data -------------------------------------------------
 async function refreshAll() {
   document.getElementById('last-update').textContent = 'Updating...';
 
@@ -437,10 +437,10 @@ async function refreshAll() {
     'Updated: ' + new Date().toLocaleTimeString('en-KE');
 }
 
-// ── Helpers ───────────────────────────────────────────────────
+// -- Helpers ---------------------------------------------------
 function kes(n) { return 'KES ' + Number(n||0).toLocaleString('en-KE'); }
 function fmtDate(ts) {
-  if (!ts) return '—';
+  if (!ts) return '--';
   return new Date(ts).toLocaleDateString('en-KE',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
 }
 function badge(s) {
@@ -464,7 +464,7 @@ function openModal(oid, status) {
 }
 function closeModal() { document.getElementById('modal').classList.remove('open'); }
 
-// ── Dashboard ─────────────────────────────────────────────────
+// -- Dashboard -------------------------------------------------
 function renderDashboard() {
   document.getElementById('st-orders').textContent  = statsData.ordersToday  || 0;
   document.getElementById('st-rev').textContent     = kes(statsData.revenueToday);
@@ -478,7 +478,7 @@ function renderDashboard() {
     var items = (o.cart||[]).map(function(i){return i.name+' x'+i.qty;}).join(', ').slice(0,40);
     return '<tr>'+
       '<td><code style="color:var(--accent);font-size:11px">'+(o.orderId||o.id)+'</code></td>'+
-      '<td>'+(o.customerName||'—')+'</td>'+
+      '<td>'+(o.customerName||'--')+'</td>'+
       '<td style="color:var(--muted);font-size:12px">'+items+'</td>'+
       '<td style="font-weight:600">'+kes(o.total)+'</td>'+
       '<td>'+badge(o.status)+'</td>'+
@@ -488,7 +488,7 @@ function renderDashboard() {
   }).join('');
 }
 
-// ── Orders ────────────────────────────────────────────────────
+// -- Orders ----------------------------------------------------
 function renderOrders() {
   var filter = document.getElementById('order-filter').value;
   var rows   = filter ? allOrders.filter(function(o){return o.status===filter;}) : allOrders;
@@ -498,8 +498,8 @@ function renderOrders() {
     var items = (o.cart||[]).map(function(i){return i.name+' x'+i.qty;}).join(', ').slice(0,50);
     return '<tr>'+
       '<td><code style="color:var(--accent);font-size:11px">'+(o.orderId||o.id)+'</code></td>'+
-      '<td>'+(o.customerName||'—')+'<br><span style="color:var(--muted);font-size:11px">'+(o.customerPhone||'')+'</span></td>'+
-      '<td style="color:var(--muted);font-size:11px;max-width:100px;overflow:hidden;text-overflow:ellipsis">'+(o.deliveryAddress||'—')+'</td>'+
+      '<td>'+(o.customerName||'--')+'<br><span style="color:var(--muted);font-size:11px">'+(o.customerPhone||'')+'</span></td>'+
+      '<td style="color:var(--muted);font-size:11px;max-width:100px;overflow:hidden;text-overflow:ellipsis">'+(o.deliveryAddress||'--')+'</td>'+
       '<td style="font-size:12px;color:var(--muted)">'+items+'</td>'+
       '<td style="font-weight:600">'+kes(o.total)+'</td>'+
       '<td>'+badge(o.status)+'</td>'+
@@ -509,7 +509,7 @@ function renderOrders() {
   }).join('');
 }
 
-// ── Customers ─────────────────────────────────────────────────
+// -- Customers -------------------------------------------------
 function renderClients() {
   var repeat = allClients.filter(function(c){return (c.orderCount||0)>1;}).length;
   document.getElementById('cl-total').textContent  = allClients.length;
@@ -527,7 +527,7 @@ function renderClients() {
   }).join('');
 }
 
-// ── Daily Report ──────────────────────────────────────────────
+// -- Daily Report ----------------------------------------------
 var activeFilterBtn = null;
 function setFilter(type, btn) {
   if (activeFilterBtn) activeFilterBtn.classList.remove('active');
@@ -590,7 +590,7 @@ function renderReport(from, to) {
     var items = (o.cart||[]).map(function(i){return i.name+' x'+i.qty;}).join(', ').slice(0,50);
     return '<tr>'+
       '<td><code style="color:var(--accent);font-size:11px">'+(o.orderId||o.id)+'</code></td>'+
-      '<td>'+(o.customerName||'—')+'</td>'+
+      '<td>'+(o.customerName||'--')+'</td>'+
       '<td style="font-size:12px;color:var(--muted)">'+items+'</td>'+
       '<td style="font-weight:600">'+kes(o.total)+'</td>'+
       '<td>'+badge(o.status)+'</td>'+
@@ -599,7 +599,7 @@ function renderReport(from, to) {
   }).join('');
 }
 
-// ── Calendar ──────────────────────────────────────────────────
+// -- Calendar --------------------------------------------------
 var selectedCalDate = null;
 function buildCalendar() {
   document.getElementById('cal-title').textContent = MONTHS[calMonth] + ' ' + calYear;
@@ -678,7 +678,7 @@ function selectCalDay(ds) {
     var items = (o.cart||[]).map(function(i){return i.name+' x'+i.qty;}).join(', ').slice(0,50);
     return '<tr>'+
       '<td><code style="color:var(--accent);font-size:11px">'+(o.orderId||o.id)+'</code></td>'+
-      '<td>'+(o.customerName||'—')+'</td>'+
+      '<td>'+(o.customerName||'--')+'</td>'+
       '<td style="font-size:12px;color:var(--muted)">'+items+'</td>'+
       '<td style="font-weight:600">'+kes(o.total)+'</td>'+
       '<td>'+badge(o.status)+'</td>'+
@@ -691,7 +691,7 @@ function calPrev()  { calMonth--; if(calMonth<0){calMonth=11;calYear--;} buildCa
 function calNext()  { calMonth++; if(calMonth>11){calMonth=0;calYear++;} buildCalendar(); }
 function calToday() { calYear=new Date().getFullYear(); calMonth=new Date().getMonth(); buildCalendar(); }
 
-// ── Analytics ─────────────────────────────────────────────────
+// -- Analytics -------------------------------------------------
 function renderAnalytics() {
   var stats = (statsData.recentStats||[]).slice(0,14).reverse();
   var chart = document.getElementById('chart-bars');
@@ -716,7 +716,7 @@ function renderAnalytics() {
     '<div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">Total Customers</div><div class="stat-val">'+allClients.length+'</div></div>';
 }
 
-// ── Config ────────────────────────────────────────────────────
+// -- Config ----------------------------------------------------
 function renderConfig() {
   if (ACCESS === 'operator') {
     document.getElementById('cfg-name').value      = configData.name          || '';
@@ -741,7 +741,7 @@ async function saveConfig() {
   if (r && r.ok) toast('Saved!'); else toast('Save failed', false);
 }
 
-// ── Order update ──────────────────────────────────────────────
+// -- Order update ----------------------------------------------
 async function updateOrder() {
   var body = {
     status:      document.getElementById('modal-status').value,
@@ -753,7 +753,7 @@ async function updateOrder() {
   else toast('Failed', false);
 }
 
-// ── Navigation ────────────────────────────────────────────────
+// -- Navigation ------------------------------------------------
 var SEC = { dashboard:'sec-dashboard', orders:'sec-orders', clients:'sec-clients', reports:'sec-reports', calendar:'sec-calendar', analytics:'sec-analytics', config:'sec-config' };
 var TTL = { dashboard:'Dashboard', orders:'Orders', clients:'Customers', reports:'Daily Report', calendar:'Order Calendar', analytics:'Analytics', config:'Configuration' };
 var SUB = { dashboard:'Today\'s overview for Nestring Foods', orders:'All customer orders', clients:'Registered customers', reports:'Sales report by date range', calendar:'Browse orders by date', analytics:'Revenue and order trends', config:'Bot and payment settings' };
@@ -774,7 +774,7 @@ function nav(key) {
 
 function logout() { localStorage.removeItem('sf_token'); window.location.href='/login.html'; }
 
-// ── Start ─────────────────────────────────────────────────────
+// -- Start -----------------------------------------------------
 initUI();
 refreshAll();
 setInterval(refreshAll, 30000);
