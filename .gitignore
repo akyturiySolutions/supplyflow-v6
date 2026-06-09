@@ -6,3 +6,4 @@ firebase.json
 firebase_online.txt
 *.json.bak
 dist/
+private_key.txt 
