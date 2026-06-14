@@ -75,10 +75,7 @@ app.get('/api/health', (_req, res) => res.json({
 }));
 
 /* ── SPA fallback ────────────────────────────────────────────── */
-app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/api') || req.path.startsWith('/webhook')) return next();
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`[SupplyFlow V6] Running on port ${PORT}`));
