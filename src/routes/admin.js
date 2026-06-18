@@ -159,6 +159,45 @@ router.patch('/orders/:id/status', async (req, res) => {
       }
     }
 
+    // Notify customer when order is delivered
+    if (status === 'DELIVERED') {
+      try {
+        const order = await db.getOrder(req.params.id);
+        const { sendMessage } = require('../bot/whatsapp');
+        const phoneNumberId   = process.env.PHONE_NUMBER_ID;
+        if (order?.customerPhone && phoneNumberId) {
+          await sendMessage(phoneNumberId, order.customerPhone,
+            `✅ *Order Delivered!*\n\n` +
+            `Order: *${req.params.id}*\n\n` +
+            `Thank you for ordering with us. Enjoy! 🎉\n\n` +
+            `Reply *menu* to place another order.`
+          );
+        }
+      } catch (notifyErr) {
+        console.error('[Delivered notify]', notifyErr.message);
+      }
+    }
+
+    // Notify customer when order is cancelled
+    if (status === 'CANCELLED') {
+      try {
+        const order = await db.getOrder(req.params.id);
+        const { sendMessage } = require('../bot/whatsapp');
+        const phoneNumberId   = process.env.PHONE_NUMBER_ID;
+        if (order?.customerPhone && phoneNumberId) {
+          const noteInfo = note ? `\nReason: ${note}` : '';
+          await sendMessage(phoneNumberId, order.customerPhone,
+            `❌ *Order Cancelled*\n\n` +
+            `Order: *${req.params.id}*${noteInfo}\n\n` +
+            `If you have any questions, please contact us.\n\n` +
+            `Reply *menu* to place a new order.`
+          );
+        }
+      } catch (notifyErr) {
+        console.error('[Cancelled notify]', notifyErr.message);
+      }
+    }
+
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
