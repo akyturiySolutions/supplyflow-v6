@@ -72,6 +72,17 @@ async function handle(phoneId, session, input, biz) {
   }
 
   /* ══════════════════════════════════════════
+     CHOOSE_SIDE — pick accompaniment (Rice/Mukimo/Chips etc)
+  ══════════════════════════════════════════ */
+  if (step === 'CHOOSE_SIDE') {
+    if (input.startsWith('SIDE_')) {
+      return doSideChosen(phoneId, session, input, biz);
+    }
+    // Anything unexpected — re-show the side options
+    return doShowSideOptions(phoneId, session, session._pendingProductId, biz);
+  }
+
+  /* ══════════════════════════════════════════
      CART_REVIEW — show cart
   ══════════════════════════════════════════ */
   if (step === 'CART_REVIEW') {
@@ -83,16 +94,20 @@ async function handle(phoneId, session, input, biz) {
       var pid   = parts.slice(1,-1).join('_');
       var allP  = biz.products || getDefaults(biz.sector);
       var prod  = allP.find(function(p){ return p.id === pid; });
+      var side  = session._pendingSide || '';
       if (prod && qty > 0) {
-        var cart = (session.cart||[]).slice();
+        var cart     = (session.cart||[]).slice();
+        var nameWithSide = side ? (prod.name + ' (' + side + ')') : prod.name;
+        // Treat same product with different sides as separate cart lines
+        var matchKey = pid + '::' + side;
         var idx  = -1;
-        for (var i=0; i<cart.length; i++) { if (cart[i].productId===pid) { idx=i; break; } }
+        for (var i=0; i<cart.length; i++) { if (cart[i]._matchKey===matchKey) { idx=i; break; } }
         if (idx >= 0) {
           cart[idx] = Object.assign({}, cart[idx], { qty: cart[idx].qty + qty });
         } else {
-          cart.push({ productId: pid, name: prod.name, qty: qty, unitPrice: prod.price });
+          cart.push({ productId: pid, name: nameWithSide, side: side, qty: qty, unitPrice: prod.price, _matchKey: matchKey });
         }
-        session = Object.assign({}, session, { cart: cart });
+        session = Object.assign({}, session, { cart: cart, _pendingSide: '' });
       }
     }
 
@@ -150,7 +165,8 @@ async function handle(phoneId, session, input, biz) {
     var isBtn = (input === 'CHECKOUT' || input === 'ADD_MORE' || input === 'CLEAR_CART' ||
                  input === 'PAY_MPESA_MANUAL' || input === 'PAY_COD' ||
                  input.startsWith('CAT_') || input.startsWith('ADD_') ||
-                 input.startsWith('QTY_') || input.startsWith('MORE_'));
+                 input.startsWith('QTY_') || input.startsWith('MORE_') ||
+                 input.startsWith('SIDE_'));
 
     if (isBtn || input.trim().length < 2) {
       await sendMessage(phoneId, session.from,
@@ -317,9 +333,65 @@ async function doAddToCart(phoneId, session, input, biz) {
     return handle(phoneId, Object.assign({}, session, { step: 'BROWSING' }), '', biz);
   }
 
+  // If this item has side/accompaniment choices, ask for that FIRST
+  if (Array.isArray(prod.accompanimentOptions) && prod.accompanimentOptions.length > 0) {
+    return doShowSideOptions(phoneId, session, pid, biz);
+  }
+
+  return doAskQuantity(phoneId, session, pid, biz, '');
+}
+
+async function doShowSideOptions(phoneId, session, pid, biz) {
+  var allP = biz.products || getDefaults(biz.sector);
+  var prod = allP.find(function(p){ return p.id===pid; });
+
+  if (!prod) {
+    await sendMessage(phoneId, session.from, 'Item not found. Please try again.');
+    return handle(phoneId, Object.assign({}, session, { step: 'BROWSING' }), '', biz);
+  }
+
+  var opts    = prod.accompanimentOptions.slice(0,3); // WhatsApp buttons max = 3
+  var buttons = opts.map(function(opt, i) {
+    return { type: 'reply', reply: { id: 'SIDE_' + pid + '_' + i, title: opt.slice(0,20) } };
+  });
+
   await sendInteractive(phoneId, session.from, {
     type: 'button',
-    body: { text: '*' + prod.name + '*\n' + formatKES(prod.price) + '\n' + (prod.description||'') + '\n\nHow many?' },
+    body: { text: '*' + prod.name + '*\n' + formatKES(prod.price) + '\n\nChoose your side:' },
+    action: { buttons: buttons }
+  });
+
+  return Object.assign({}, session, { step: 'CHOOSE_SIDE', _pendingProductId: pid });
+}
+
+async function doSideChosen(phoneId, session, input, biz) {
+  var rest    = input.replace('SIDE_','');
+  var lastUs  = rest.lastIndexOf('_');
+  var pid     = rest.slice(0, lastUs);
+  var idx     = parseInt(rest.slice(lastUs+1), 10);
+
+  var allP = biz.products || getDefaults(biz.sector);
+  var prod = allP.find(function(p){ return p.id===pid; });
+
+  if (!prod || !Array.isArray(prod.accompanimentOptions)) {
+    await sendMessage(phoneId, session.from, 'Something went wrong. Please try again.');
+    return handle(phoneId, Object.assign({}, session, { step: 'BROWSING' }), '', biz);
+  }
+
+  var chosenSide = prod.accompanimentOptions[idx] || prod.accompanimentOptions[0];
+
+  return doAskQuantity(phoneId, session, pid, biz, chosenSide);
+}
+
+async function doAskQuantity(phoneId, session, pid, biz, chosenSide) {
+  var allP = biz.products || getDefaults(biz.sector);
+  var prod = allP.find(function(p){ return p.id===pid; });
+
+  var sideLabel = chosenSide ? (' (' + chosenSide + ')') : '';
+
+  await sendInteractive(phoneId, session.from, {
+    type: 'button',
+    body: { text: '*' + prod.name + sideLabel + '*\n' + formatKES(prod.price) + '\n' + (prod.description||'') + '\n\nHow many?' },
     action: {
       buttons: [
         { type: 'reply', reply: { id: 'QTY_'+pid+'_1', title: '1' } },
@@ -329,7 +401,7 @@ async function doAddToCart(phoneId, session, input, biz) {
     }
   });
 
-  return Object.assign({}, session, { step: 'CART_REVIEW' });
+  return Object.assign({}, session, { step: 'CART_REVIEW', _pendingSide: chosenSide || '' });
 }
 
 function getDefaults(sector) {
