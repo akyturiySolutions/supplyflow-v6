@@ -111,7 +111,31 @@ nav{flex:1;padding:16px 12px}
 .toast.show{transform:translateY(0)}
 /* Error banner */
 .err-banner{background:rgba(244,63,94,.1);border:1px solid rgba(244,63,94,.3);color:var(--danger);padding:12px 18px;border-radius:10px;font-size:13px;margin-bottom:16px;display:none}
-@media print{.sidebar,.topbar,.btn-refresh,.btn-sm,.filter-bar,.modal-bg{display:none!important}.main{margin-left:0!important;padding:10px!important}.section{display:block!important}body{background:#fff!important;color:#000!important}}
+.kitchen-ticket-hidden{display:none}
+@media print{
+  .sidebar,.topbar,.btn-refresh,.btn-sm,.filter-bar,.modal-bg{display:none!important}
+  .main{margin-left:0!important;padding:10px!important}
+  .section{display:block!important}
+  body{background:#fff!important;color:#000!important}
+}
+body.printing-ticket > *:not(#kitchen-ticket){display:none!important}
+body.printing-ticket #kitchen-ticket{display:block!important}
+@media print{
+  @page{size:80mm auto;margin:0}
+  body.printing-ticket{background:#fff!important;margin:0!important;padding:0!important}
+  body.printing-ticket #kitchen-ticket{
+    display:block!important;width:80mm!important;
+    font-family:'Courier New',monospace;color:#000!important;
+    padding:4mm 3mm;font-size:12px;line-height:1.45;
+  }
+  #kitchen-ticket .kt-center{text-align:center}
+  #kitchen-ticket .kt-bold{font-weight:700}
+  #kitchen-ticket .kt-big{font-size:16px;font-weight:700}
+  #kitchen-ticket .kt-line{border-top:1px dashed #000;margin:6px 0}
+  #kitchen-ticket .kt-row{display:flex;justify-content:space-between;gap:8px}
+  #kitchen-ticket .kt-item{margin:4px 0}
+  #kitchen-ticket .kt-side{font-style:italic;color:#000;padding-left:8px}
+}
 </style>
 </head>
 <body>
@@ -343,6 +367,7 @@ nav{flex:1;padding:16px 12px}
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<div id="kitchen-ticket" class="kitchen-ticket-hidden"></div>
 
 <script>
 // -- Constants -------------------------------------------------
@@ -466,6 +491,48 @@ function openModal(oid, status) {
 }
 function closeModal() { document.getElementById('modal').classList.remove('open'); }
 
+// -- Kitchen Ticket Printing (80mm POS printer) -----------------
+function printKitchenTicket(oid) {
+  var order = allOrders.find(function(o) { return (o.orderId || o.id) === oid; });
+  if (!order) { toast('Order not found', false); return; }
+
+  var items = (order.cart || []).map(function(i) {
+    var sideLine = i.side ? ('<div class="kt-side">Side: ' + i.side + '</div>') : '';
+    return '<div class="kt-item"><div class="kt-row"><span class="kt-bold">' + (i.qty || 1) + ' x ' + (i.name || '') + '</span></div>' + sideLine + '</div>';
+  }).join('');
+
+  var total = (order.cart || []).reduce(function(s, i) { return s + (i.qty || 1) * (i.unitPrice || 0); }, 0);
+  var now   = new Date();
+  var stamp = now.toLocaleDateString('en-KE') + ' ' + now.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
+
+  var html =
+    '<div class="kt-center kt-big">NESTRING FOODS</div>' +
+    '<div class="kt-center">Fresh Meals - Great Taste</div>' +
+    '<div class="kt-line"></div>' +
+    '<div class="kt-center kt-bold">KITCHEN ORDER TICKET</div>' +
+    '<div class="kt-line"></div>' +
+    '<div class="kt-row"><span class="kt-bold">Order:</span><span>' + (order.orderId || order.id) + '</span></div>' +
+    '<div class="kt-row"><span>Customer:</span><span>' + (order.customerName || '--') + '</span></div>' +
+    (order.deliveryAddress ? '<div class="kt-row"><span>Deliver to:</span><span>' + order.deliveryAddress + '</span></div>' : '') +
+    '<div class="kt-row"><span>Printed:</span><span>' + stamp + '</span></div>' +
+    '<div class="kt-line"></div>' +
+    items +
+    '<div class="kt-line"></div>' +
+    '<div class="kt-row kt-bold"><span>TOTAL</span><span>KES ' + total.toLocaleString() + '</span></div>' +
+    '<div class="kt-line"></div>' +
+    '<div class="kt-center">Status: ' + (order.status || '').replace(/_/g, ' ') + '</div>' +
+    '<div class="kt-center" style="margin-top:8px">Thank you!</div>';
+
+  document.getElementById('kitchen-ticket').innerHTML = html;
+  document.body.classList.add('printing-ticket');
+
+  window.print();
+
+  setTimeout(function() {
+    document.body.classList.remove('printing-ticket');
+  }, 500);
+}
+
 // -- Dashboard -------------------------------------------------
 function renderDashboard() {
   document.getElementById('st-orders').textContent  = statsData.ordersToday  || 0;
@@ -485,7 +552,7 @@ function renderDashboard() {
       '<td style="font-weight:600">'+kes(o.total)+'</td>'+
       '<td>'+badge(o.status)+'</td>'+
       '<td style="color:var(--muted);font-size:11px">'+fmtDate(o.createdAt)+'</td>'+
-      '<td><button class="btn-sm btn-outline" onclick="openModal(\''+( o.orderId||o.id)+'\',\''+o.status+'\')">Edit</button></td>'+
+      '<td><button class="btn-sm btn-outline" onclick="openModal(\''+( o.orderId||o.id)+'\',\''+o.status+'\')">Edit</button> <button class="btn-sm btn-green" onclick="printKitchenTicket(\''+(o.orderId||o.id)+'\')">&#128424; Print</button></td>'+
       '</tr>';
   }).join('');
 }
@@ -506,7 +573,7 @@ function renderOrders() {
       '<td style="font-weight:600">'+kes(o.total)+'</td>'+
       '<td>'+badge(o.status)+'</td>'+
       '<td style="color:var(--muted);font-size:11px">'+fmtDate(o.createdAt)+'</td>'+
-      '<td><button class="btn-sm btn-outline" onclick="openModal(\''+(o.orderId||o.id)+'\',\''+o.status+'\')">Update</button></td>'+
+      '<td><button class="btn-sm btn-outline" onclick="openModal(\''+(o.orderId||o.id)+'\',\''+o.status+'\')">Update</button> <button class="btn-sm btn-green" onclick="printKitchenTicket(\''+(o.orderId||o.id)+'\')">&#128424; Print</button></td>'+
       '</tr>';
   }).join('');
 }
