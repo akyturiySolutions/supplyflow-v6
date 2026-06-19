@@ -63,6 +63,7 @@ async function handleIncomingMessage(msg, metadata, contact) {
       case 'BROWSING':
       case 'CATEGORY_ITEMS':
       case 'ADD_TO_CART':
+      case 'CHOOSE_SIDE':
       case 'CART_REVIEW':
       case 'DELIVERY_DETAILS':
       case 'TYPING_ADDRESS':
