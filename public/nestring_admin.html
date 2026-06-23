@@ -366,6 +366,24 @@ body.printing-ticket #kitchen-ticket{display:block!important}
     </div>
   </div>
 </div>
+<div class="modal-bg" id="unavail-modal">
+  <div class="modal">
+    <h3>Notify Customer - Item Unavailable <span id="unavail-oid" style="color:var(--mt);font-size:13px"></span></h3>
+    <div class="fl"><label>Which item is unavailable?</label>
+      <select id="unavail-item-select" onchange="onUnavailItemChange()">
+        <option value="">-- Select an item from this order --</option>
+      </select>
+    </div>
+    <div class="fl"><label>Message to send (you can edit this)</label>
+      <textarea id="unavail-message" style="min-height:110px" placeholder="e.g. Beef is unavailable today. Would you like Ugali instead, or something else?"></textarea>
+    </div>
+    <p style="font-size:12px;color:var(--mt);margin-bottom:10px">This sends a WhatsApp message directly to the customer. Their reply will appear in the normal WhatsApp chat for you to respond to.</p>
+    <div class="ma">
+      <button class="bs bo" onclick="closeUnavailModal()">Cancel</button>
+      <button class="bs" style="background:var(--gold);color:#000" onclick="sendUnavailNotice()">Send to Customer</button>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 <div id="kitchen-ticket" class="kitchen-ticket-hidden"></div>
 
@@ -491,6 +509,57 @@ function openModal(oid, status) {
 }
 function closeModal() { document.getElementById('modal').classList.remove('open'); }
 
+// -- Notify Customer: Item Unavailable --------------------------
+var _unavailOid = '';
+
+function openUnavailModal(oid) {
+  _unavailOid = oid;
+  var order = allOrders.find(function(o) { return (o.orderId || o.id) === oid; });
+  if (!order) { toast('Order not found', false); return; }
+
+  document.getElementById('unavail-oid').textContent = oid;
+
+  var sel = document.getElementById('unavail-item-select');
+  sel.innerHTML = '<option value="">-- Select an item from this order --</option>';
+  (order.cart || []).forEach(function (item) {
+    var opt = document.createElement('option');
+    opt.value = item.name;
+    opt.textContent = (item.qty || 1) + ' x ' + item.name;
+    sel.appendChild(opt);
+  });
+
+  document.getElementById('unavail-message').value = '';
+  document.getElementById('unavail-modal').classList.add('on');
+}
+
+function closeUnavailModal() {
+  document.getElementById('unavail-modal').classList.remove('on');
+}
+
+function onUnavailItemChange() {
+  var itemName = document.getElementById('unavail-item-select').value;
+  if (!itemName) return;
+  document.getElementById('unavail-message').value =
+    itemName + ' is unavailable today. Would you like a different side, or something else from the menu?';
+}
+
+async function sendUnavailNotice() {
+  var msg = document.getElementById('unavail-message').value.trim();
+  if (!msg) { toast('Please enter a message', false); return; }
+
+  var r = await api('/api/admin/orders/' + _unavailOid + '/notify-unavailable', {
+    method: 'POST',
+    body: JSON.stringify({ message: msg })
+  });
+
+  if (r && r.ok) {
+    toast('Customer notified!');
+    closeUnavailModal();
+  } else {
+    toast((r && r.error) ? r.error : 'Failed to send', false);
+  }
+}
+
 // -- Kitchen Ticket Printing (80mm POS printer) -----------------
 function printKitchenTicket(oid) {
   var order = allOrders.find(function(o) { return (o.orderId || o.id) === oid; });
@@ -552,7 +621,7 @@ function renderDashboard() {
       '<td style="font-weight:600">'+kes(o.total)+'</td>'+
       '<td>'+badge(o.status)+'</td>'+
       '<td style="color:var(--muted);font-size:11px">'+fmtDate(o.createdAt)+'</td>'+
-      '<td><button class="btn-sm btn-outline" onclick="openModal(\''+( o.orderId||o.id)+'\',\''+o.status+'\')">Edit</button> <button class="btn-sm btn-green" onclick="printKitchenTicket(\''+(o.orderId||o.id)+'\')">&#128424; Print</button></td>'+
+      '<td><button class="btn-sm btn-outline" onclick="openModal(\''+( o.orderId||o.id)+'\',\''+o.status+'\')">Edit</button> <button class="btn-sm btn-green" onclick="printKitchenTicket(\''+(o.orderId||o.id)+'\')">&#128424; Print</button> <button class="bs" style="background:var(--gold);color:#000" onclick="openUnavailModal(\''+(o.orderId||o.id)+'\')">&#9888; Unavailable</button></td>'+
       '</tr>';
   }).join('');
 }
@@ -573,7 +642,7 @@ function renderOrders() {
       '<td style="font-weight:600">'+kes(o.total)+'</td>'+
       '<td>'+badge(o.status)+'</td>'+
       '<td style="color:var(--muted);font-size:11px">'+fmtDate(o.createdAt)+'</td>'+
-      '<td><button class="btn-sm btn-outline" onclick="openModal(\''+(o.orderId||o.id)+'\',\''+o.status+'\')">Update</button> <button class="btn-sm btn-green" onclick="printKitchenTicket(\''+(o.orderId||o.id)+'\')">&#128424; Print</button></td>'+
+      '<td><button class="btn-sm btn-outline" onclick="openModal(\''+(o.orderId||o.id)+'\',\''+o.status+'\')">Update</button> <button class="btn-sm btn-green" onclick="printKitchenTicket(\''+(o.orderId||o.id)+'\')">&#128424; Print</button> <button class="bs" style="background:var(--gold);color:#000" onclick="openUnavailModal(\''+(o.orderId||o.id)+'\')">&#9888; Unavailable</button></td>'+
       '</tr>';
   }).join('');
 }

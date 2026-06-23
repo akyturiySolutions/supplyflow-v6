@@ -204,6 +204,42 @@ router.patch('/orders/:id/status', async (req, res) => {
   }
 });
 
+/**
+ * POST /orders/:id/notify-unavailable
+ * Sends a custom WhatsApp message to the customer about an unavailable
+ * item, suggesting alternatives. The customer's reply lands in the normal
+ * WhatsApp chat for the business owner to handle manually -- the bot
+ * does NOT auto-process this reply (by design, kept simple and human).
+ */
+router.post('/orders/:id/notify-unavailable', requireAuth, async (req, res) => {
+  try {
+    const { message } = req.body;
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: 'message is required' });
+    }
+
+    const order = await db.getOrder(req.params.id);
+    if (!order || !order.customerPhone) {
+      return res.status(404).json({ error: 'Order or customer phone not found' });
+    }
+
+    const { sendMessage } = require('../bot/whatsapp');
+    const phoneNumberId = process.env.PHONE_NUMBER_ID;
+    if (!phoneNumberId) {
+      return res.status(500).json({ error: 'PHONE_NUMBER_ID not configured' });
+    }
+
+    await sendMessage(phoneNumberId, order.customerPhone,
+      '⚠️ *Update on your order ' + req.params.id + '*\n\n' + message.trim()
+    );
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[Notify unavailable]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ── Clients ─────────────────────────────────────────────────── */
 router.get('/clients', async (req, res) => {
   try {

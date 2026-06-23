@@ -389,16 +389,15 @@ async function doAskQuantity(phoneId, session, pid, biz, chosenSide) {
 
   var sideLabel = chosenSide ? (' (' + chosenSide + ')') : '';
 
+  var qtyRows = [];
+  for (var n = 1; n <= 10; n++) {
+    qtyRows.push({ id: 'QTY_'+pid+'_'+n, title: String(n), description: n===1 ? '1 item' : (n+' items') });
+  }
+
   await sendInteractive(phoneId, session.from, {
-    type: 'button',
-    body: { text: '*' + prod.name + sideLabel + '*\n' + formatKES(prod.price) + '\n' + (prod.description||'') + '\n\nHow many?' },
-    action: {
-      buttons: [
-        { type: 'reply', reply: { id: 'QTY_'+pid+'_1', title: '1' } },
-        { type: 'reply', reply: { id: 'QTY_'+pid+'_2', title: '2' } },
-        { type: 'reply', reply: { id: 'QTY_'+pid+'_3', title: '3' } },
-      ]
-    }
+    type: 'list',
+    body: { text: '*' + prod.name + sideLabel + '*\n' + formatKES(prod.price) + '\n' + (prod.description||'') + '\n\nHow many would you like?' },
+    action: { button: 'Choose Quantity', sections: [{ title: 'Quantity', rows: qtyRows }] }
   });
 
   return Object.assign({}, session, { step: 'CART_REVIEW', _pendingSide: chosenSide || '' });
