@@ -5,7 +5,7 @@
 const { sendMessage, sendInteractive, markRead } = require('./whatsapp');
 const { getSession, setSession }                 = require('./session');
 const { getBusinessConfig }                      = require('../db/firestore');
-const { checkAccess }                            = require('./goosAccess');
+// const { checkAccess }                            = require('./goosAccess'); // TEMP DISABLED - see note below
 const orderFlow   = require('./flows/orderFlow');
 const trackFlow   = require('./flows/trackFlow');
 const supportFlow = require('./flows/supportFlow');
@@ -18,15 +18,18 @@ async function handleIncomingMessage(msg, metadata, contact) {
 
   markRead(phoneId, msg.id).catch(() => {});
 
-  // GO OS subscription gate — checked on every message, cached 5 min.
-  // Fails open: if GO OS is unreachable, the bot keeps working normally.
-  const access = await checkAccess(bizId);
-  if (!access.access) {
-    await sendMessage(phoneId, from,
-      'This service is temporarily paused. Please contact the business owner to resolve your account.'
-    );
-    return;
-  }
+  // GO OS subscription gate — TEMPORARILY DISABLED (2026-06-23)
+  // Reason: stabilizing core ordering features (quantity list, side-dish
+  // choices, unavailable-item notices) before re-attaching billing.
+  // To re-enable: uncomment the block below.
+  //
+  // const access = await checkAccess(bizId);
+  // if (!access.access) {
+  //   await sendMessage(phoneId, from,
+  //     'This service is temporarily paused. Please contact the business owner to resolve your account.'
+  //   );
+  //   return;
+  // }
 
   const biz = await getBusinessConfig(bizId);
 
