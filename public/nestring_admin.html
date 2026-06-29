@@ -529,11 +529,11 @@ function openUnavailModal(oid) {
   });
 
   document.getElementById('unavail-message').value = '';
-  document.getElementById('unavail-modal').classList.add('on');
+  document.getElementById('unavail-modal').classList.add('open');
 }
 
 function closeUnavailModal() {
-  document.getElementById('unavail-modal').classList.remove('on');
+  document.getElementById('unavail-modal').classList.remove('open');
 }
 
 function onUnavailItemChange() {
