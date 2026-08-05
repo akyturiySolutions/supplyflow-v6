@@ -60,6 +60,9 @@ nav{flex:1;padding:16px 12px}
 .badge.DISPATCHED,.badge.PROCESSING{background:rgba(139,195,74,.15);color:var(--accent2)}
 .badge.DELIVERED{background:rgba(76,175,80,.25);color:#69f070}
 .badge.CANCELLED{background:rgba(244,63,94,.15);color:var(--danger)}
+@keyframes rowUnattendedBlink{0%,100%{background:rgba(244,63,94,.38)}50%{background:rgba(244,63,94,.06)}}
+tr.row-unattended{animation:rowUnattendedBlink 1s ease-in-out infinite;box-shadow:inset 3px 0 0 var(--danger)}
+tr.row-unattended td{position:relative}
 .btn-sm{padding:5px 11px;font-size:12px;font-weight:600;border:none;border-radius:7px;cursor:pointer;transition:.15s}
 .btn-green{background:var(--accent);color:#000}
 .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
@@ -400,6 +403,13 @@ if (!TOKEN) { window.location.href = '/login.html'; }
 
 // -- State -----------------------------------------------------
 var allOrders  = [];
+// Orders in these statuses are treated as "not yet attended to" and will
+// blink red on the dashboard/orders table until staff moves them past this
+// point (e.g. to PROCESSING) via the Update button.
+var UNATTENDED_STATUSES = { PENDING_PAYMENT: true, PAID: true, CONFIRMED_COD: true };
+// Orders whose Update modal has been opened at least once this session —
+// stops the red blink immediately, without waiting for a status change.
+var acknowledgedOrders = {};
 var allClients = [];
 var statsData  = {};
 var configData = {};
@@ -550,6 +560,12 @@ function openModal(oid, status) {
   document.getElementById('modal-driver').value       = '';
   document.getElementById('modal-note').value         = '';
   document.getElementById('modal').classList.add('open');
+
+  if (!acknowledgedOrders[oid]) {
+    acknowledgedOrders[oid] = true;
+    renderDashboard();
+    renderOrders();
+  }
 }
 function closeModal() { document.getElementById('modal').classList.remove('open'); }
 
@@ -657,8 +673,10 @@ function renderDashboard() {
   var rows  = allOrders.slice(0,10);
   if (!rows.length) { tbody.innerHTML='<tr><td colspan="7" class="empty">No orders yet</td></tr>'; return; }
   tbody.innerHTML = rows.map(function(o){
-    var items = (o.cart||[]).map(function(i){return i.name+' x'+i.qty;}).join(', ').slice(0,40);
-    return '<tr>'+
+    var items  = (o.cart||[]).map(function(i){return i.name+' x'+i.qty;}).join(', ').slice(0,40);
+    var oid    = o.orderId || o.id;
+    var rowCls = (UNATTENDED_STATUSES[o.status] && !acknowledgedOrders[oid]) ? ' class="row-unattended"' : '';
+    return '<tr'+rowCls+'>'+
       '<td><code style="color:var(--accent);font-size:11px">'+(o.orderId||o.id)+'</code></td>'+
       '<td>'+(o.customerName||'--')+'</td>'+
       '<td style="color:var(--muted);font-size:12px">'+items+'</td>'+
@@ -677,8 +695,10 @@ function renderOrders() {
   var tbody  = document.getElementById('all-orders');
   if (!rows.length) { tbody.innerHTML='<tr><td colspan="8" class="empty">No orders found</td></tr>'; return; }
   tbody.innerHTML = rows.map(function(o){
-    var items = (o.cart||[]).map(function(i){return i.name+' x'+i.qty;}).join(', ').slice(0,50);
-    return '<tr>'+
+    var items  = (o.cart||[]).map(function(i){return i.name+' x'+i.qty;}).join(', ').slice(0,50);
+    var oid    = o.orderId || o.id;
+    var rowCls = (UNATTENDED_STATUSES[o.status] && !acknowledgedOrders[oid]) ? ' class="row-unattended"' : '';
+    return '<tr'+rowCls+'>'+
       '<td><code style="color:var(--accent);font-size:11px">'+(o.orderId||o.id)+'</code></td>'+
       '<td>'+(o.customerName||'--')+'<br><span style="color:var(--muted);font-size:11px">'+(o.customerPhone||'')+'</span></td>'+
       '<td style="color:var(--muted);font-size:11px;max-width:100px;overflow:hidden;text-overflow:ellipsis">'+(o.deliveryAddress||'--')+'</td>'+
